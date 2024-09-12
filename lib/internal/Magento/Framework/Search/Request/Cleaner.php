@@ -1,29 +1,13 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Framework\Search\Request;
 
 use Magento\Framework\Exception\StateException;
+use Magento\Framework\Search\Request\Aggregation\StatusInterface as AggregationStatus;
+use Magento\Framework\Phrase;
 
 class Cleaner
 {
@@ -43,6 +27,21 @@ class Cleaner
     private $mappedFilters;
 
     /**
+     * @var AggregationStatus
+     */
+    private $aggregationStatus;
+
+    /**
+     * Cleaner constructor
+     *
+     * @param AggregationStatus $aggregationStatus
+     */
+    public function __construct(AggregationStatus $aggregationStatus)
+    {
+        $this->aggregationStatus = $aggregationStatus;
+    }
+
+    /**
      * Clean not binder queries and filters
      *
      * @param array $requestData
@@ -53,6 +52,7 @@ class Cleaner
         $this->clear();
         $this->requestData = $requestData;
         $this->cleanQuery($requestData['query']);
+        $this->cleanAggregations();
         $requestData = $this->requestData;
         $this->clear();
 
@@ -66,13 +66,17 @@ class Cleaner
      * @return void
      * @throws StateException
      * @throws \Exception
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.UnusedLocalVariable)
      */
     private function cleanQuery($queryName)
     {
         if (!isset($this->requestData['queries'][$queryName])) {
             throw new \Exception('Query ' . $queryName . ' does not exist');
         } elseif (in_array($queryName, $this->mappedQueries)) {
-            throw new StateException('Cycle found. Query %1 already used in request hierarchy', [$queryName]);
+            throw new StateException(
+                new Phrase('Cycle found. Query %1 already used in request hierarchy', [$queryName])
+            );
         }
         $this->mappedQueries[] = $queryName;
         $query = $this->requestData['queries'][$queryName];
@@ -86,7 +90,7 @@ class Cleaner
                 }
                 break;
             case QueryInterface::TYPE_MATCH:
-                if (preg_match('/\$(.+)\$/si', $query['value'], $matches)) {
+                if (!array_key_exists('is_bind', $query)) {
                     unset($this->requestData['queries'][$queryName]);
                 }
                 break;
@@ -113,36 +117,67 @@ class Cleaner
     }
 
     /**
+     * Clean aggregations if we don't need to process them
+     *
+     * @return void
+     */
+    private function cleanAggregations()
+    {
+        if (!$this->aggregationStatus->isEnabled()) {
+            $this->requestData['aggregations'] = [];
+        } else {
+            if (array_key_exists('aggregations', $this->requestData) && is_array($this->requestData['aggregations'])) {
+                foreach ($this->requestData['aggregations'] as $aggregationName => $aggregationValue) {
+                    switch ($aggregationValue['type']) {
+                        case 'dynamicBucket':
+                            if (is_string($aggregationValue['method'])
+                                && preg_match('/^\$(.+)\$$/si', $aggregationValue['method'])
+                            ) {
+                                unset($this->requestData['aggregations'][$aggregationName]);
+                            }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Clear don't bind filters
      *
      * @param string $filterName
      * @return void
      * @throws StateException
      * @throws \Exception
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     private function cleanFilter($filterName)
     {
         if (!isset($this->requestData['filters'][$filterName])) {
             throw new \Exception('Filter ' . $filterName . ' does not exist');
         } elseif (in_array($filterName, $this->mappedFilters)) {
-            throw new StateException('Cycle found. Filter %1 already used in request hierarchy', [$filterName]);
+            throw new StateException(
+                new Phrase('Cycle found. Filter %1 already used in request hierarchy', [$filterName])
+            );
         }
         $this->mappedFilters[] = $filterName;
         $filter = $this->requestData['filters'][$filterName];
         switch ($filter['type']) {
             case FilterInterface::TYPE_WILDCARD:
             case FilterInterface::TYPE_TERM:
-                if (is_string($filter['value']) && preg_match('/\$(.+)\$/si', $filter['value'], $matches)) {
+                if (!array_key_exists('is_bind', $filter)) {
                     unset($this->requestData['filters'][$filterName]);
                 }
                 break;
             case FilterInterface::TYPE_RANGE:
                 $keys = ['from', 'to'];
                 foreach ($keys as $key) {
-                    if (isset($filter[$key]) && preg_match('/\$(.+)\$/si', $filter[$key], $matches)) {
-                        unset($this->requestData['filters'][$filterName]);
-                        break;
+                    if (isset($filter[$key]) && preg_match('/^\$(.+)\$$/si', $filter[$key])) {
+                        unset($this->requestData['filters'][$filterName][$key]);
                     }
+                }
+                $filterKeys = array_keys($this->requestData['filters'][$filterName]);
+                if (count(array_diff($keys, $filterKeys)) == count($keys)) {
+                    unset($this->requestData['filters'][$filterName]);
                 }
                 break;
             case FilterInterface::TYPE_BOOL:

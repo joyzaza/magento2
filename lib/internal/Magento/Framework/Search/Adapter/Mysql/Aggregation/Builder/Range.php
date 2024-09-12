@@ -1,33 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Framework\Search\Adapter\Mysql\Aggregation\Builder;
 
-use Magento\Framework\App\Resource;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\DB\Ddl\Table;
 use Magento\Framework\DB\Select;
+use Magento\Framework\Search\Adapter\Mysql\Aggregation\DataProviderInterface;
 use Magento\Framework\Search\Request\Aggregation\Range as AggregationRange;
 use Magento\Framework\Search\Request\Aggregation\RangeBucket;
 use Magento\Framework\Search\Request\BucketInterface as RequestBucketInterface;
+use Magento\Framework\Translate\AdapterInterface;
 
 class Range implements BucketInterface
 {
@@ -38,47 +23,50 @@ class Range implements BucketInterface
      * @var Metrics
      */
     private $metricsBuilder;
+
     /**
      * @var Resource
      */
     private $resource;
 
     /**
-     * @param Metrics $metricsBuilder
-     * @param Resource $resource
+     * @var AdapterInterface
      */
-    public function __construct(Metrics $metricsBuilder, Resource $resource)
+    private $connection;
+
+    /**
+     * @param Metrics $metricsBuilder
+     * @param ResourceConnection $resource
+     */
+    public function __construct(Metrics $metricsBuilder, ResourceConnection $resource)
     {
         $this->metricsBuilder = $metricsBuilder;
         $this->resource = $resource;
+        $this->connection = $resource->getConnection();
     }
 
     /**
      * {@inheritdoc}
      */
-    public function build(Select $baseQuery, RequestBucketInterface $bucket, array $entityIds)
-    {
+    public function build(
+        DataProviderInterface $dataProvider,
+        array $dimensions,
+        RequestBucketInterface $bucket,
+        Table $entityIdsTable
+    ) {
         /** @var RangeBucket $bucket */
+        $select = $dataProvider->getDataSet($bucket, $dimensions, $entityIdsTable);
         $metrics = $this->metricsBuilder->build($bucket);
 
-        $baseQuery->where('main_table.entity_id IN (?)', $entityIds);
-
         /** @var Select $fullQuery */
-        $fullQuery = $this->getConnection()->select();
-        $fullQuery->from(['main_table' => $baseQuery], null);
+        $fullQuery = $this->connection
+            ->select();
+        $fullQuery->from(['main_table' => $select], null);
         $fullQuery = $this->generateCase($fullQuery, $bucket->getRanges());
         $fullQuery->columns($metrics);
-        $fullQuery->group(RequestBucketInterface::FIELD_VALUE);
+        $fullQuery->group(new \Zend_Db_Expr('1'));
 
-        return $fullQuery;
-    }
-
-    /**
-     * @return \Magento\Framework\DB\Adapter\AdapterInterface
-     */
-    private function getConnection()
-    {
-        return $this->resource->getConnection(Resource::DEFAULT_READ_RESOURCE);
+        return $dataProvider->execute($fullQuery);
     }
 
     /**
@@ -98,14 +86,16 @@ class Range implements BucketInterface
                     $casesResults,
                     ["`{$field}` BETWEEN {$from} AND {$to}" => "'{$from}_{$to}'"]
                 );
-            } elseif ($from && !$to) {
+            } elseif ($from) {
                 $casesResults = array_merge($casesResults, ["`{$field}` >= {$from}" => "'{$from}_*'"]);
-            } elseif (!$from && $to) {
+            } elseif ($to) {
                 $casesResults = array_merge($casesResults, ["`{$field}` < {$to}" => "'*_{$to}'"]);
             }
         }
-        $cases = $this->getConnection()->getCaseSql('', $casesResults);
+        $cases = $this->connection
+            ->getCaseSql('', $casesResults);
         $select->columns([RequestBucketInterface::FIELD_VALUE => $cases]);
+
         return $select;
     }
 }

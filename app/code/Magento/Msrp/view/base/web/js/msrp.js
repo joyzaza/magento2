@@ -1,97 +1,275 @@
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Academic Free License (AFL 3.0)
- * that is bundled with this package in the file LICENSE_AFL.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
-/*jshint browser:true jquery:true*/
-define(["jquery", "jquery/ui", "mage/dropdown"], function($) {
+define([
+    'jquery',
+    'underscore',
+    'jquery/ui',
+    'mage/dropdown',
+    'mage/template'
+], function ($) {
+    'use strict';
+
     $.widget('mage.addToCart', {
         options: {
             showAddToCart: true,
-            cartForm: '.form.map.checkout'
+            submitUrl: '',
+            cartButtonId: '',
+            singleOpenDropDown: true,
+            dialog: {}, // Options for mage/dropdown
+            dialogDelay: 500, // Delay in ms after resize dropdown shown again
+            origin: '', //Required, type of popup: 'msrp', 'tier' or 'info' popup
+
+            // Selectors
+            cartForm: '.form.map.checkout',
+            msrpLabelId: '#map-popup-msrp',
+            priceLabelId: '#map-popup-price',
+            popUpAttr: '[data-role=msrp-popup-template]',
+            popupCartButtonId: '#map-popup-button',
+            paypalCheckoutButons: '[data-action=checkout-form-submit]',
+            popupId: '',
+            realPrice: '',
+            isSaleable: '',
+            msrpPrice: '',
+            helpLinkId: '',
+            addToCartButton: '',
+
+            // Text options
+            productName: '',
+            addToCartUrl: ''
         },
 
-        _create: function() {
-            $(this.options.cartButtonId).on('click', $.proxy(function() {
-                this._addToCartSubmit();
-            }, this));
+        openDropDown: null,
+        triggerClass: 'dropdown-active',
 
-            $(this.options.popupId).on('click', $.proxy(function(e) {
-                if (this.options.submitUrl) {
-                    location.href = this.options.submitUrl;
-                } else {
-                    $(this.options.popupCartButtonId).off('click');
-                    $(this.options.popupCartButtonId).on('click', $.proxy(function() {
-                        this._addToCartSubmit();
-                    }, this));
-                    $('#map-popup-heading-price').text(this.options.productName);
-                    $('#map-popup-price').html($(this.options.realPrice));
-                    $('#map-popup-msrp > span.price').html(this.options.msrpPrice);
-                    this.element.trigger('reloadPrice');
-                    var dialog = $("#map-popup-click-for-price");
-                    this._popupDialog(dialog, this.options.popupId);
-                    if (this.options.addToCartUrl) {
-                        $(this.options.cartForm).attr('action', this.options.addToCartUrl);
-                    }
-                    if (!this.options.showAddToCart) {
-                        $('#product_addtocart_form_from_popup').hide();
-                    }
-                    return false;
-                }
-            }, this));
-
-            $(this.options.helpLinkId).on('click', $.proxy(function(e) {
-                $('#map-popup-heading-what-this').text(this.options.productName);
-                var dialog = $("#map-popup-what-this");
-                this._popupDialog(dialog, this.options.helpLinkId);
-                return false;
-            }, this));
+        popUpOptions: {
+            appendTo: 'body',
+            dialogContentClass: 'active',
+            closeOnMouseLeave: false,
+            autoPosition: true,
+            closeOnClickOutside: false,
+            'dialogClass': 'popup map-popup-wrapper',
+            position: {
+                my: 'left top',
+                collision: 'fit none',
+                at: 'left bottom',
+                within: 'body'
+            },
+            shadowHinter: 'popup popup-pointer'
         },
+        popupOpened: false,
 
-        _popupDialog: function(target, trigger) {
-            if (!target.hasClass('ui-dialog-content')) {
-                target.dropdownDialog({
-                    appendTo: ".column.main",
-                    dialogContentClass: 'active',
-                    timeout: "2000",
-                    autoPosition: true,
-                    "dialogClass": "popup"
-                });
+        /**
+         * Creates widget instance
+         * @private
+         */
+        _create: function () {
+            if (this.options.origin === 'msrp') {
+                this.initMsrpPopup();
+            } else if (this.options.origin === 'info') {
+                this.initInfoPopup();
+            } else if (this.options.origin === 'tier') {
+                this.initTierPopup();
             }
-            $('.mage-dropdown-dialog > .ui-dialog-content').dropdownDialog("close");
-            target.dropdownDialog("option", "position", {my: "right+50% top", collision: "none", at: "center bottom", of: trigger});
-            target.dropdownDialog("option", "triggerTarget", trigger);
-            target.dropdownDialog("open");
-
+            $(this.options.cartButtonId).on('click', this._addToCartSubmit.bind(this));
         },
 
-        _addToCartSubmit: function() {
-            this.element.trigger('addToCart', this.element);
+        /**
+         * Init msrp popup
+         * @private
+         */
+        initMsrpPopup: function () {
+            var popupDOM = $(this.options.popUpAttr)[0],
+                $msrpPopup = $(popupDOM.innerHTML.trim());
+
+            $msrpPopup.find(this.options.productIdInput).val(this.options.productId);
+            $('body').append($msrpPopup);
+            $msrpPopup.trigger('contentUpdated');
+
+            $msrpPopup.find('button')
+                .on('click',
+                this.handleMsrpAddToCart.bind(this))
+                .filter(this.options.popupCartButtonId)
+                .text($(this.options.addToCartButton).text());
+
+            $msrpPopup.find(this.options.paypalCheckoutButons).on('click',
+                this.handleMsrpPaypalCheckout.bind(this));
+
+            $(this.options.popupId).on('click',
+                this.openPopup.bind(this));
+
+            this.$popup = $msrpPopup;
+        },
+
+        /**
+         * Init info popup
+         * @private
+         */
+        initInfoPopup: function () {
+            var infoPopupDOM = $('[data-role=msrp-info-template]')[0],
+                $infoPopup = $(infoPopupDOM.innerHTML.trim());
+
+            $('body').append($infoPopup);
+
+            $(this.options.helpLinkId).on('click', function (e) {
+                this.popUpOptions.position.of = $(e.target);
+                $infoPopup.dropdownDialog(this.popUpOptions).dropdownDialog('open');
+                this._toggle($infoPopup);
+            }.bind(this));
+
+            this.$popup = $infoPopup;
+        },
+
+        /**
+         * Init tier price popup
+         * @private
+         */
+        initTierPopup: function () {
+            var popupDOM = $(this.options.popUpAttr)[0],
+                $tierPopup = $(popupDOM.innerHTML.trim());
+
+            $('body').append($tierPopup);
+            $tierPopup.find(this.options.productIdInput).val(this.options.productId);
+            this.popUpOptions.position.of = $(this.options.helpLinkId);
+
+            $tierPopup.find('button').on('click',
+                this.handleTierAddToCart.bind(this))
+                .filter(this.options.popupCartButtonId)
+                .text($(this.options.addToCartButton).text());
+
+            $tierPopup.find(this.options.paypalCheckoutButons).on('click',
+                this.handleTierPaypalCheckout.bind(this));
+
+            $(this.options.attr).on('click', function (e) {
+                this.$popup = $tierPopup;
+                this.tierOptions = $(e.target).data('tier-price');
+                this.openPopup(e);
+            }.bind(this));
+        },
+
+        /**
+         * handle 'AddToCart' click on Msrp popup
+         * @param {Object} ev
+         *
+         * @private
+         */
+        handleMsrpAddToCart: function (ev) {
+            ev.preventDefault();
+
             if (this.options.addToCartButton) {
                 $(this.options.addToCartButton).click();
-                return;
+                this.closePopup(this.$popup);
             }
+        },
+
+        /**
+         * handle 'paypal checkout buttons' click on Msrp popup
+         *
+         * @private
+         */
+        handleMsrpPaypalCheckout: function () {
+            this.closePopup(this.$popup);
+        },
+
+        /**
+         * handle 'AddToCart' click on Tier popup
+         *
+         * @param {Object} ev
+         * @private
+         */
+        handleTierAddToCart: function (ev) {
+            ev.preventDefault();
+
+            if (this.options.addToCartButton &&
+                this.options.inputQty && !isNaN(this.tierOptions.qty)
+            ) {
+                $(this.options.inputQty).val(this.tierOptions.qty);
+                $(this.options.addToCartButton).click();
+                this.closePopup(this.$popup);
+            }
+        },
+
+        /**
+         * handle 'paypal checkout buttons' click on Tier popup
+         *
+         * @private
+         */
+        handleTierPaypalCheckout: function () {
+            if (this.options.inputQty && !isNaN(this.tierOptions.qty)
+            ) {
+                $(this.options.inputQty).val(this.tierOptions.qty);
+                this.closePopup(this.$popup);
+            }
+        },
+
+        /**
+         * Open and set up popup
+         *
+         * @param {Object} event
+         */
+        openPopup: function (event) {
+            var options = this.tierOptions || this.options;
+
+            this.popUpOptions.position.of = $(event.target);
+            this.$popup.find(this.options.msrpLabelId).html(options.msrpPrice);
+            this.$popup.find(this.options.priceLabelId).html(options.realPrice);
+            this.$popup.dropdownDialog(this.popUpOptions).dropdownDialog('open');
+            this._toggle(this.$popup);
+
+            if (!this.options.isSaleable) {
+                this.$popup.find('form').hide();
+            }
+        },
+
+        /**
+         *
+         * @param {HTMLElement} $elem
+         * @private
+         */
+        _toggle: function ($elem) {
+            $(document).on('mouseup.msrp touchend.msrp', function (e) {
+                if (!$elem.is(e.target) && $elem.has(e.target).length === 0) {
+                    this.closePopup($elem);
+                }
+            }.bind(this));
+            $(window).on('resize', function () {
+                this.closePopup($elem);
+            }.bind(this));
+        },
+
+        /**
+         *
+         * @param {HTMLElement} $elem
+         */
+        closePopup: function ($elem) {
+            $elem.dropdownDialog('close');
+            $(document).off('mouseup.msrp touchend.msrp');
+        },
+
+        /**
+         * Handler for addToCart action
+         */
+        _addToCartSubmit: function () {
+            this.element.trigger('addToCart', this.element);
+
+            if (this.element.data('stop-processing')) {
+                return false;
+            }
+
+            if (this.options.addToCartButton) {
+                $(this.options.addToCartButton).click();
+
+                return false;
+            }
+
             if (this.options.addToCartUrl) {
-                $('.mage-dropdown-dialog > .ui-dialog-content').dropdownDialog("close");
+                $('.mage-dropdown-dialog > .ui-dialog-content').dropdownDialog('close');
             }
             $(this.options.cartForm).submit();
+
         }
     });
+
+    return $.mage.addToCart;
 });

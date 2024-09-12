@@ -1,33 +1,16 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Block\Widget\Grid\Column\Renderer;
 
 use Magento\Backend\Block\Widget\Grid\Column;
-use Magento\Framework\Object;
+use Magento\Framework\DataObject;
 
 /**
  * Backend grid item abstract renderer
+ * @SuppressWarnings(PHPMD.NumberOfChildren)
  */
 abstract class AbstractRenderer extends \Magento\Backend\Block\AbstractBlock implements RendererInterface
 {
@@ -65,14 +48,14 @@ abstract class AbstractRenderer extends \Magento\Backend\Block\AbstractBlock imp
      * @param   Object $row
      * @return  string
      */
-    public function render(Object $row)
+    public function render(DataObject $row)
     {
         if ($this->getColumn()->getEditable()) {
-            $value = $this->_getValue($row);
-            return $value . ($this->getColumn()->getEditOnly() ? '' : ($value !=
-                '' ? '' : '&nbsp;')) . $this->_getInputValueElement(
-                    $row
-                );
+            $result = '<div class="admin__grid-control">';
+            $result .= $this->getColumn()->getEditOnly() ? ''
+                : '<span class="admin__grid-control-value">' . $this->_getValue($row) . '</span>';
+
+            return $result . $this->_getInputValueElement($row) . '</div>' ;
         }
         return $this->_getValue($row);
     }
@@ -83,7 +66,7 @@ abstract class AbstractRenderer extends \Magento\Backend\Block\AbstractBlock imp
      * @param Object $row
      * @return string
      */
-    public function renderExport(Object $row)
+    public function renderExport(DataObject $row)
     {
         return $this->render($row);
     }
@@ -92,7 +75,7 @@ abstract class AbstractRenderer extends \Magento\Backend\Block\AbstractBlock imp
      * @param Object $row
      * @return mixed
      */
-    protected function _getValue(Object $row)
+    protected function _getValue(DataObject $row)
     {
         if ($getter = $this->getColumn()->getGetter()) {
             if (is_string($getter)) {
@@ -109,7 +92,7 @@ abstract class AbstractRenderer extends \Magento\Backend\Block\AbstractBlock imp
      * @param Object $row
      * @return string
      */
-    public function _getInputValueElement(Object $row)
+    public function _getInputValueElement(DataObject $row)
     {
         return '<input type="text" class="input-text ' .
             $this->getColumn()->getValidateClass() .
@@ -125,7 +108,7 @@ abstract class AbstractRenderer extends \Magento\Backend\Block\AbstractBlock imp
      * @param Object $row
      * @return mixed
      */
-    protected function _getInputValue(Object $row)
+    protected function _getInputValue(DataObject $row)
     {
         return $this->_getValue($row);
     }
@@ -140,26 +123,23 @@ abstract class AbstractRenderer extends \Magento\Backend\Block\AbstractBlock imp
             $dir = strtolower($this->getColumn()->getDir());
             $nDir = $dir == 'asc' ? 'desc' : 'asc';
             if ($this->getColumn()->getDir()) {
-                $className = 'sort-arrow-' . $dir;
+                $className = '_' . $dir . 'end';
             }
-            $out = '<a href="#" name="' .
+            $out = '<th data-sort="' .
                 $this->getColumn()->getId() .
-                '" title="' .
+                '" data-direction="' .
                 $nDir .
-                '" class="' .
-                $className .
-                '">' .
-                '<label class="sort-title" for=' .
-                $this->getColumn()->getHtmlId() .
-                '>' .
+                '" class="data-grid-th _sortable ' .
+                $className . ' ' .
+                $this->getColumn()->getHeaderCssClass() .
+                '"><span>' .
                 $this->getColumn()->getHeader() .
-                '</label></a>';
+                '</span></th>';
         } else {
-            $out = '<label for=' .
-                $this->getColumn()->getHtmlId() .
-                '>' .
+            $out = '<th class="data-grid-th ' .
+                $this->getColumn()->getHeaderCssClass() . '"><span>' .
                 $this->getColumn()->getHeader() .
-                '</label>';
+                '</span></th>';
         }
         return $out;
     }

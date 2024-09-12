@@ -1,33 +1,24 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Framework\Search\Request;
 
 use Magento\Framework\Exception\StateException;
 use Magento\Framework\Search\Request\Query\Filter;
+use Magento\Framework\Phrase;
 
+/**
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
 class Mapper
 {
+    /**
+     * @var QueryInterface
+     */
+    private $rootQuery;
+
     /**
      * @var array
      */
@@ -54,17 +45,17 @@ class Mapper
     private $aggregations;
 
     /**
-     * @var \Magento\Framework\ObjectManager
+     * @var \Magento\Framework\ObjectManagerInterface
      */
     private $objectManager;
 
     /**
-     * @var QueryInterface
+     * @var string
      */
-    private $rootQuery = null;
+    private $rootQueryName;
 
     /**
-     * @param \Magento\Framework\ObjectManager $objectManager
+     * @param \Magento\Framework\ObjectManagerInterface $objectManager
      * @param array $queries
      * @param string $rootQueryName
      * @param array $aggregations
@@ -74,7 +65,7 @@ class Mapper
      * @throws StateException
      */
     public function __construct(
-        \Magento\Framework\ObjectManager $objectManager,
+        \Magento\Framework\ObjectManagerInterface $objectManager,
         array $queries,
         $rootQueryName,
         array $aggregations = [],
@@ -84,26 +75,26 @@ class Mapper
         $this->queries = $queries;
         $this->aggregations = $aggregations;
         $this->filters = $filters;
-
-        $this->rootQuery = $this->get($rootQueryName);
+        $this->rootQueryName = $rootQueryName;
     }
 
     /**
      * Get Query Interface by name
      *
-     * @param string $queryName
      * @return QueryInterface
      * @throws \Exception
      * @throws \InvalidArgumentException
      * @throws StateException
      */
-    private function get($queryName)
+    public function getRootQuery()
     {
-        $this->mappedQueries = [];
-        $this->mappedFilters = [];
-        $query = $this->mapQuery($queryName);
-        $this->validate();
-        return $query;
+        if (!$this->rootQuery) {
+            $this->mappedQueries = [];
+            $this->mappedFilters = [];
+            $this->rootQuery = $this->mapQuery($this->rootQueryName);
+            $this->validate();
+        }
+        return $this->rootQuery;
     }
 
     /**
@@ -114,13 +105,16 @@ class Mapper
      * @throws \Exception
      * @throws \InvalidArgumentException
      * @throws StateException
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     private function mapQuery($queryName)
     {
         if (!isset($this->queries[$queryName])) {
             throw new \Exception('Query ' . $queryName . ' does not exist');
         } elseif (in_array($queryName, $this->mappedQueries)) {
-            throw new StateException('Cycle found. Query %1 already used in request hierarchy', [$queryName]);
+            throw new StateException(
+                new Phrase('Cycle found. Query %1 already used in request hierarchy', [$queryName])
+            );
         }
         $this->mappedQueries[] = $queryName;
         $query = $this->queries[$queryName];
@@ -159,7 +153,7 @@ class Mapper
             case QueryInterface::TYPE_BOOL:
                 $aggregatedByType = $this->aggregateQueriesByType($query['queryReference']);
                 $query = $this->objectManager->create(
-                    'Magento\Framework\Search\Request\Query\Bool',
+                    'Magento\Framework\Search\Request\Query\BoolExpression',
                     array_merge(
                         ['name' => $query['name'], 'boost' => isset($query['boost']) ? $query['boost'] : 1],
                         $aggregatedByType
@@ -187,7 +181,9 @@ class Mapper
         if (!isset($this->filters[$filterName])) {
             throw new \Exception('Filter ' . $filterName . ' does not exist');
         } elseif (in_array($filterName, $this->mappedFilters)) {
-            throw new StateException('Cycle found. Filter %1 already used in request hierarchy', [$filterName]);
+            throw new StateException(
+                new Phrase('Cycle found. Filter %1 already used in request hierarchy', [$filterName])
+            );
         }
         $this->mappedFilters[] = $filterName;
         $filter = $this->filters[$filterName];
@@ -226,7 +222,7 @@ class Mapper
             case FilterInterface::TYPE_BOOL:
                 $aggregatedByType = $this->aggregateFiltersByType($filter['filterReference']);
                 $filter = $this->objectManager->create(
-                    'Magento\Framework\Search\Request\Filter\Bool',
+                    'Magento\Framework\Search\Request\Filter\BoolExpression',
                     array_merge(
                         ['name' => $filter['name']],
                         $aggregatedByType
@@ -300,7 +296,7 @@ class Mapper
         $allElements = array_keys($elements);
         $notUsedElements = implode(', ', array_diff($allElements, $mappedElements));
         if (!empty($notUsedElements)) {
-            throw new StateException($errorMessage, [$notUsedElements]);
+            throw new StateException(new Phrase($errorMessage, [$notUsedElements]));
         }
     }
 
@@ -314,14 +310,6 @@ class Mapper
     }
 
     /**
-     * @return QueryInterface
-     */
-    public function getRootQuery()
-    {
-        return $this->rootQuery;
-    }
-
-    /**
      * Build BucketInterface[] from array
      *
      * @return array
@@ -329,12 +317,12 @@ class Mapper
      */
     public function getBuckets()
     {
-        $buckets = array();
+        $buckets = [];
         foreach ($this->aggregations as $bucketData) {
             $arguments = [
                 'name' => $bucketData['name'],
                 'field' => $bucketData['field'],
-                'metrics' => $this->mapMetrics($bucketData)
+                'metrics' => $this->mapMetrics($bucketData),
             ];
             switch ($bucketData['type']) {
                 case BucketInterface::TYPE_TERM:
@@ -362,7 +350,8 @@ class Mapper
                     );
                     break;
                 default:
-                    throw new StateException('Invalid bucket type');
+                    throw new StateException(new Phrase('Invalid bucket type'));
+                    break;
             }
             $buckets[] = $bucket;
         }
@@ -400,7 +389,7 @@ class Mapper
      */
     private function mapRanges(array $bucketData)
     {
-        $rangeObjects = array();
+        $rangeObjects = [];
         if (isset($bucketData['range'])) {
             $ranges = $bucketData['range'];
             foreach ($ranges as $range) {

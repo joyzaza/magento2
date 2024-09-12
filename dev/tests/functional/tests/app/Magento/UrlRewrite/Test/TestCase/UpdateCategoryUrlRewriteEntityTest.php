@@ -1,35 +1,17 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\UrlRewrite\Test\TestCase;
 
-use Magento\Catalog\Test\Fixture\CatalogCategory;
-use Mtf\TestCase\Injectable;
-use Magento\UrlRewrite\Test\Page\Adminhtml\UrlRewriteIndex;
-use Magento\UrlRewrite\Test\Page\Adminhtml\UrlRewriteEdit;
-use Mtf\Fixture\FixtureFactory;
+use Magento\Catalog\Test\Fixture\Category;
 use Magento\UrlRewrite\Test\Fixture\UrlRewrite;
+use Magento\UrlRewrite\Test\Page\Adminhtml\UrlRewriteEdit;
+use Magento\UrlRewrite\Test\Page\Adminhtml\UrlRewriteIndex;
+use Magento\Mtf\Fixture\FixtureFactory;
+use Magento\Mtf\TestCase\Injectable;
 
 /**
  * Test Creation for UpdateCategoryUrlRewritesEntity
@@ -44,15 +26,20 @@ use Magento\UrlRewrite\Test\Fixture\UrlRewrite;
  * 1. Log in to backend as Admin.
  * 2. Go to the Marketing-> SEO & Search->URL Rewrites.
  * 3. Click Category URL Rewrite from grid.
- * 4. Edit test value(s) according to dataSet.
+ * 4. Edit test value(s) according to dataset.
  * 5. Click 'Save' button.
  * 6. Perform all asserts.
  *
- * @group URL_Rewrites_(MX)
+ * @group URL_Rewrites_(PS)
  * @ZephyrId MAGETWO-24838
  */
 class UpdateCategoryUrlRewriteEntityTest extends Injectable
 {
+    /* tags */
+    const MVP = 'yes';
+    const DOMAIN = 'PS';
+    /* end tags */
+
     /**
      * Url rewrite index page
      *
@@ -68,19 +55,19 @@ class UpdateCategoryUrlRewriteEntityTest extends Injectable
     protected $urlRewriteEdit;
 
     /**
-     * Prepare dataSets and pages
+     * Prepare datasets and pages
      *
      * @param UrlRewriteIndex $urlRewriteIndex
      * @param UrlRewriteEdit $urlRewriteEdit
      * @param FixtureFactory $fixtureFactory
-     * @param CatalogCategory $category
+     * @param Category $category
      * @return array
      */
     public function __inject(
         UrlRewriteIndex $urlRewriteIndex,
         UrlRewriteEdit $urlRewriteEdit,
         FixtureFactory $fixtureFactory,
-        CatalogCategory $category
+        Category $category
     ) {
         $this->urlRewriteIndex = $urlRewriteIndex;
         $this->urlRewriteEdit = $urlRewriteEdit;
@@ -88,8 +75,8 @@ class UpdateCategoryUrlRewriteEntityTest extends Injectable
         $categoryRedirect = $fixtureFactory->createByCode(
             'urlRewrite',
             [
-                'dataSet' => 'default',
-                'data' => ['id_path' => ['category/' . $category->getId()]]
+                'dataset' => 'default',
+                'data' => ['target_path' => $category->getUrlKey() . '.html']
             ]
         );
         $categoryRedirect->persist();

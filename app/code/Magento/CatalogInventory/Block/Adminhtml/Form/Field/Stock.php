@@ -1,25 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 /**
@@ -55,10 +37,18 @@ class Stock extends \Magento\Framework\Data\Form\Element\Select
     protected $_factoryText;
 
     /**
+     * Core registry
+     *
+     * @var \Magento\Framework\Registry
+     */
+    protected $coreRegistry;
+
+    /**
      * @param \Magento\Framework\Data\Form\Element\Factory $factoryElement
      * @param \Magento\Framework\Data\Form\Element\CollectionFactory $factoryCollection
      * @param \Magento\Framework\Escaper $escaper
      * @param \Magento\Framework\Data\Form\Element\TextFactory $factoryText
+     * @param \Magento\Framework\Registry $coreRegistry
      * @param array $data
      */
     public function __construct(
@@ -66,12 +56,14 @@ class Stock extends \Magento\Framework\Data\Form\Element\Select
         \Magento\Framework\Data\Form\Element\CollectionFactory $factoryCollection,
         \Magento\Framework\Escaper $escaper,
         \Magento\Framework\Data\Form\Element\TextFactory $factoryText,
-        array $data = array()
+        \Magento\Framework\Registry $coreRegistry,
+        array $data = []
     ) {
         $this->_factoryText = $factoryText;
         $this->_qty = isset($data['qty']) ? $data['qty'] : $this->_createQtyElement();
         unset($data['qty']);
         parent::__construct($factoryElement, $factoryCollection, $escaper, $data);
+        $this->coreRegistry = $coreRegistry;
         $this->setName($data['name']);
     }
 
@@ -182,10 +174,10 @@ class Stock extends \Magento\Framework\Data\Form\Element\Select
      */
     protected function _getJs($quantityFieldId, $inStockFieldId)
     {
+        $isNewProduct = (int)$this->coreRegistry->registry('product')->isObjectNew();
         return "
             <script type='text/javascript'>
-                require(['jquery'], function(jQuery) {
-                    jQuery(function($) {
+                require(['jquery', 'prototype', 'domReady!'], function($) {
                         var qty = $('#{$quantityFieldId}'),
                             productType = $('#product_type_id').val(),
                             stockAvailabilityField = $('#{$inStockFieldId}'),
@@ -196,6 +188,7 @@ class Stock extends \Magento\Framework\Data\Form\Element\Select
                                 '{$inStockFieldId}': 'inventory_stock_availability'
                             };
 
+                        var qtyDefaultValue = qty.val();
                         var disabler = function(event) {
                             if (typeof(event) === 'undefined') {
                                 return;
@@ -203,8 +196,15 @@ class Stock extends \Magento\Framework\Data\Form\Element\Select
                             var stockBeforeDisable = $.Event('stockbeforedisable', {productType: productType});
                             $('[data-tab-panel=product-details]').trigger(stockBeforeDisable);
                             if (stockBeforeDisable.result !== false) {
-                                var manageStockValue = (qty.val() === '') ? 0 : 1,
-                                    stockAssociations = $('#' + fieldsAssociations['{$inStockFieldId}']);
+                                var manageStockValue = {$isNewProduct}
+                                    ? (qty.val() === '' ? 0 : 1)
+                                    : parseInt(manageStockField.val());
+                                if ({$isNewProduct} && qtyDefaultValue !== null && qtyDefaultValue === qty.val()) {
+                                    manageStockValue = parseInt(manageStockField.val());
+                                } else {
+                                    qtyDefaultValue = null;
+                                }
+                                var stockAssociations = $('#' + fieldsAssociations['{$inStockFieldId}']);
                                 stockAvailabilityField.prop('disabled', !manageStockValue);
                                 stockAssociations.prop('disabled', !manageStockValue);
                                 if ($(event.currentTarget).attr('id') === qty.attr('id') && event.type != 'change') {
@@ -249,12 +249,10 @@ class Stock extends \Magento\Framework\Data\Form\Element\Select
                         $.each(fieldsAssociations, function(generalTabField, advancedTabField) {
                             $('#' + generalTabField + ', #' + advancedTabField)
                                 .bind('focus blur change keyup click', filler)
-                                .bind('keyup change blur', disabler);
-                            filler.call($('#' + generalTabField));
-                            filler.call($('#' + advancedTabField));
+                                .bind('keyup change blur', disabler)
+                                .trigger('change');
                         });
-                        disabler();
-                    });
+
                 })
             </script>
         ";

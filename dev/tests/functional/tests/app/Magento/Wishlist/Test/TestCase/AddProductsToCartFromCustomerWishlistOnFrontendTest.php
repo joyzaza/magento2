@@ -1,38 +1,15 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Wishlist\Test\TestCase;
 
-use Mtf\ObjectManager;
 use Magento\Checkout\Test\Fixture\Cart;
-use Magento\Customer\Test\Fixture\CustomerInjectable;
+use Magento\Customer\Test\Fixture\Customer;
 
 /**
- * Test Creation for Adding products from Wishlist to Cart
- *
- * Test Flow:
- *
  * Preconditions:
  * 1. Create customer and login to frontend
  * 2. Create products
@@ -47,17 +24,22 @@ use Magento\Customer\Test\Fixture\CustomerInjectable;
  * @group Wishlist_(CS)
  * @ZephyrId MAGETWO-25268
  */
-class AddProductsToCartFromCustomerWishlistOnFrontendTest extends AbstractWishlistOnFrontend
+class AddProductsToCartFromCustomerWishlistOnFrontendTest extends AbstractWishlistTest
 {
+    /* tags */
+    const MVP = 'no';
+    const DOMAIN = 'CS';
+    /* end tags */
+
     /**
-     * Run suggest searching result test
+     * Run suggest searching result test.
      *
-     * @param CustomerInjectable $customer
+     * @param Customer $customer
      * @param string $products
      * @param int $qty
      * @return array
      */
-    public function test(CustomerInjectable $customer, $products, $qty)
+    public function test(Customer $customer, $products, $qty)
     {
         // Preconditions
         $customer->persist();
@@ -75,7 +57,7 @@ class AddProductsToCartFromCustomerWishlistOnFrontendTest extends AbstractWishli
     }
 
     /**
-     * Add products from wish list to cart
+     * Add products from wish list to cart.
      *
      * @param array $products
      * @param int $qty
@@ -83,21 +65,25 @@ class AddProductsToCartFromCustomerWishlistOnFrontendTest extends AbstractWishli
      */
     protected function addToCart(array $products, $qty)
     {
+        $productBlock = $this->wishlistIndex->getWishlistBlock()->getProductItemsBlock();
         foreach ($products as $product) {
             $this->cmsIndex->getLinksBlock()->openLink("My Wish List");
+            $this->cmsIndex->getCmsPageBlock()->waitPageInit();
             if ($qty != '-') {
-                $this->wishlistIndex->getItemsBlock()->getItemProduct($product)->fillProduct(['qty' => $qty]);
+                $productBlock->getItemProduct($product)->fillProduct(['qty' => $qty]);
                 $this->wishlistIndex->getWishlistBlock()->clickUpdateWishlist();
             }
-            $this->wishlistIndex->getItemsBlock()->getItemProduct($product)->clickAddToCart();
-            if (strpos($this->browser->getUrl(), 'checkout/cart/') === false) {
+            $productBlock->getItemProduct($product)->clickAddToCart();
+            $this->cmsIndex->getCmsPageBlock()->waitPageInit();
+            if (!$this->wishlistIndex->getWishlistBlock()->isVisible()) {
                 $this->catalogProductView->getViewBlock()->addToCart($product);
+                $this->catalogProductView->getMessagesBlock()->waitSuccessMessage();
             }
         }
     }
 
     /**
-     * Create cart fixture
+     * Create cart fixture.
      *
      * @param array $products
      * @return Cart

@@ -1,25 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Weee\Model\Total\Invoice;
 
@@ -41,9 +23,9 @@ class Weee extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
      * attributes This behavior may change in child classes
      *
      * @param \Magento\Weee\Helper\Data $weeeData
-     * @param array $data
+     * @param array                     $data
      */
-    public function __construct(\Magento\Weee\Helper\Data $weeeData, array $data = array())
+    public function __construct(\Magento\Weee\Helper\Data $weeeData, array $data = [])
     {
         $this->_weeeData = $weeeData;
         parent::__construct($data);
@@ -52,8 +34,11 @@ class Weee extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
     /**
      * Collect Weee amounts for the invoice
      *
-     * @param \Magento\Sales\Model\Order\Invoice $invoice
+     * @param  \Magento\Sales\Model\Order\Invoice $invoice
      * @return $this
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
     public function collect(\Magento\Sales\Model\Order\Invoice $invoice)
     {
@@ -72,11 +57,12 @@ class Weee extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
             $orderItem = $item->getOrderItem();
             $orderItemQty = $orderItem->getQtyOrdered();
 
-            if (!$orderItemQty || $orderItem->isDummy() || $item->getQty() <= 0) {
+            if (!$orderItemQty || $orderItem->isDummy() || $item->getQty() < 0) {
                 continue;
             }
 
             $ratio = $item->getQty() / $orderItemQty;
+
             $orderItemWeeeAmount = $orderItem->getWeeeTaxAppliedRowAmount();
             $orderItemBaseWeeeAmount = $orderItem->getBaseWeeeTaxAppliedRowAmnt();
             $weeeAmount = $invoice->roundPrice($orderItemWeeeAmount * $ratio);
@@ -106,30 +92,34 @@ class Weee extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
             //Set the ratio of the tax amount in invoice item compared to tax amount in order item
             //This information is needed to calculate tax per tax rate later
             if ($orderItemWeeeTax != 0) {
-                if (!$item->getTaxRatio()) {
-                    $item->setTaxRatio([]);
+                $taxRatio = [];
+                if ($item->getTaxRatio()) {
+                    $taxRatio = unserialize($item->getTaxRatio());
                 }
-                $taxRatio = $item->getTaxRatio();
                 $taxRatio[\Magento\Weee\Model\Total\Quote\Weee::ITEM_TYPE] = $itemWeeeTax / $orderItemWeeeTax;
-                $item->setTaxRatio($taxRatio);
+                $item->setTaxRatio(serialize($taxRatio));
             }
 
             $item->setWeeeTaxAppliedRowAmount($weeeAmount);
             $item->setBaseWeeeTaxAppliedRowAmount($baseWeeeAmount);
-            $newApplied = array();
-            $applied = $this->_weeeData->getApplied($item);
+            $newApplied = [];
+            $applied = $this->_weeeData->getApplied($orderItem);
             foreach ($applied as $one) {
-                $one['base_row_amount'] = $baseWeeeAmount;
-                $one['row_amount'] = $weeeAmount;
-                $one['base_row_amount_incl_tax'] = $baseWeeeAmountInclTax;
-                $one['row_amount_incl_tax'] = $weeeAmountInclTax;
+                $title = (string)$one['title'];
+                $one['base_row_amount'] = $invoice->roundPrice($one['base_row_amount'] * $ratio, $title.'_base');
+                $one['row_amount'] = $invoice->roundPrice($one['row_amount'] * $ratio, $title);
+                $one['base_row_amount_incl_tax'] = $invoice->roundPrice(
+                    $one['base_row_amount_incl_tax'] * $ratio,
+                    $title.'_base'
+                );
+                $one['row_amount_incl_tax'] = $invoice->roundPrice($one['row_amount_incl_tax'] * $ratio, $title);
 
                 $newApplied[] = $one;
             }
             $this->_weeeData->setApplied($item, $newApplied);
 
             //Update order item
-            $newApplied = array();
+            $newApplied = [];
             $applied = $this->_weeeData->getApplied($orderItem);
             foreach ($applied as $one) {
                 if (isset($one[WeeeHelper::KEY_BASE_WEEE_AMOUNT_INVOICED])) {
@@ -165,7 +155,7 @@ class Weee extends \Magento\Sales\Model\Order\Invoice\Total\AbstractTotal
 
             $totalWeeeAmount += $weeeAmount;
             $baseTotalWeeeAmount += $baseWeeeAmount;
-            
+
             $totalWeeeAmountInclTax += $weeeAmountInclTax;
             $baseTotalWeeeAmountInclTax += $baseWeeeAmountInclTax;
         }

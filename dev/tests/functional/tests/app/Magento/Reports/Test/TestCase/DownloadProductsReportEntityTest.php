@@ -1,40 +1,18 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Reports\Test\TestCase;
 
 use Magento\Customer\Test\Page\CustomerAccountIndex;
 use Magento\Downloadable\Test\Page\DownloadableCustomerProducts;
-use Mtf\TestCase\Injectable;
-use Mtf\Client\Browser;
 use Magento\Sales\Test\Fixture\OrderInjectable;
+use Magento\Mtf\Client\BrowserInterface;
+use Magento\Mtf\TestCase\Injectable;
 
 /**
- * Test Creation for DownloadProductsReportEntity
- *
- * Test Flow:
- *
  * Preconditions:
  * 1. Create customer.
  * 2. Create downloadable product.
@@ -52,38 +30,44 @@ use Magento\Sales\Test\Fixture\OrderInjectable;
  */
 class DownloadProductsReportEntityTest extends Injectable
 {
+    /* tags */
+    const MVP = 'no';
+    const DOMAIN = 'MX';
+    /* end tags */
+
     /**
-     * Browser Interface
+     * Browser Interface.
      *
-     * @var Browser
+     * @var BrowserInterface
      */
     protected $browser;
 
     /**
-     * Customer Account index page
+     * Customer Account index page.
      *
      * @var CustomerAccountIndex
      */
     protected $customerAccount;
 
     /**
-     * Downloadable Customer Products page
+     * Downloadable Customer Products page.
      *
      * @var DownloadableCustomerProducts
      */
     protected $customerProducts;
 
     /**
-     * Inject pages
+     * Inject pages.
      *
      * @param CustomerAccountIndex $customerAccount
      * @param DownloadableCustomerProducts $customerProducts
+     * @param BrowserInterface $browser
      * @return void
      */
     public function __inject(
         CustomerAccountIndex $customerAccount,
         DownloadableCustomerProducts $customerProducts,
-        Browser $browser
+        BrowserInterface $browser
     ) {
         $this->customerAccount = $customerAccount;
         $this->customerProducts = $customerProducts;
@@ -91,7 +75,7 @@ class DownloadProductsReportEntityTest extends Injectable
     }
 
     /**
-     * Order downloadable product
+     * Order downloadable product.
      *
      * @param OrderInjectable $order
      * @param string $downloads
@@ -107,7 +91,7 @@ class DownloadProductsReportEntityTest extends Injectable
     }
 
     /**
-     * Open Downloadable Link
+     * Open Downloadable Link.
      *
      * @param OrderInjectable $order
      * @param int $downloads
@@ -121,13 +105,12 @@ class DownloadProductsReportEntityTest extends Injectable
         );
         $customerLogin->run();
         $this->customerAccount->getAccountMenuBlock()->openMenuItem('My Downloadable Products');
+        $downloadableProductsUrl = $this->browser->getUrl();
         foreach ($order->getEntityId()['products'] as $product) {
             foreach ($product->getDownloadableLinks()['downloadable']['link'] as $link) {
                 for ($i = 0; $i < $downloads; $i++) {
-                    $this->customerProducts->getMainBlock()->openLink($link['title']);
-                    $this->browser->selectWindow();
-                    $this->browser->closeWindow();
-                    $this->browser->selectWindow();
+                    $this->browser->open($this->customerProducts->getMainBlock()->getLinkUrl($link['title']));
+                    $this->browser->open($downloadableProductsUrl);
                 }
             }
         }

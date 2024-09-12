@@ -1,25 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Checkout\Test\Block\Cart\Sidebar;
@@ -40,6 +22,20 @@ class Item extends Sidebar
     protected $removeItem = '.action.delete';
 
     /**
+     * Selector for "Edit item" button
+     *
+     * @var string
+     */
+    protected $editItem = '.action.edit';
+
+    /**
+     * Selector for confirm.
+     *
+     * @var string
+     */
+    protected $confirmModal = '.confirm._show[data-role=modal]';
+
+    /**
      * Remove product item from mini cart
      *
      * @return void
@@ -47,6 +43,20 @@ class Item extends Sidebar
     public function removeItemFromMiniCart()
     {
         $this->_rootElement->find($this->removeItem)->click();
-        $this->_rootElement->acceptAlert();
+        $element = $this->browser->find($this->confirmModal);
+        /** @var \Magento\Ui\Test\Block\Adminhtml\Modal $modal */
+        $modal = $this->blockFactory->create('Magento\Ui\Test\Block\Adminhtml\Modal', ['element' => $element]);
+        $modal->acceptAlert();
+        $modal->waitModalWindowToDisappear();
+    }
+
+    /**
+     * Click "Edit item" button
+     *
+     * @return void
+     */
+    public function clickEditItem()
+    {
+        $this->_rootElement->find($this->editItem)->click();
     }
 }

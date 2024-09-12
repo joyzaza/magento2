@@ -1,61 +1,17 @@
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Academic Free License (AFL 3.0)
- * that is bundled with this package in the file LICENSE_AFL.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @category    storage
- * @package     test
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 /** Creates scope binding and registers in to ko.bindingHandlers object */
 define([
     'ko',
-    'Magento_Ui/js/lib/registry/registry',
+    'uiRegistry',
     'jquery',
     'mage/translate'
-], function(ko, registry, $) {
+], function (ko, registry, $) {
     'use strict';
 
     var i18n = $.mage.__;
-
-    /**
-     * Fetches components from registry and stores them to context object, then passes it to callback function.
-     * @param {Object} components - map, representing components to be attached to the new context.
-     * @param {Function} callback - Function to be called when components are fetched.
-     */
-    function getMultiple(components, callback) {
-        var key,
-            paths = [],
-            context = {};
-
-        for (key in components) {
-            paths.push(components[key]);
-        }
-
-        registry.get(paths, function() {
-
-            for (key in components) {
-                context[key] = registry.get(components[key]);
-            }
-
-            callback(context);
-        });
-    }
 
     /**
      * Creates child context with passed component param as $data. Extends context with $t helper.
@@ -66,8 +22,12 @@ define([
      */
     function applyComponents(el, bindingContext, component) {
         component = bindingContext.createChildContext(component);
-        
-        ko.utils.extend(component, { $t: i18n });
+
+        ko.utils.extend(component, {
+            $t: i18n
+        });
+
+        ko.utils.arrayForEach(el.childNodes, ko.cleanNode);
 
         ko.applyBindingsToDescendants(component, el);
     }
@@ -79,7 +39,9 @@ define([
          * @returns {Object} - Knockout declaration for it to let binding control descendants.
          */
         init: function () {
-            return { controlsDescendantBindings: true };
+            return {
+                controlsDescendantBindings: true
+            };
         },
 
         /**
@@ -91,13 +53,17 @@ define([
          * @param {Object} viewModel - Object, which represents view model binded to el.
          * @param {ko.bindingContext} bindingContext - Instance of ko.bindingContext, passed to binding initially.
          */
-        update: function(el, valueAccessor, allBindings, viewModel, bindingContext) {
+        update: function (el, valueAccessor, allBindings, viewModel, bindingContext) {
             var component = valueAccessor(),
                 apply = applyComponents.bind(this, el, bindingContext);
 
-            typeof component === 'object' ?
-                getMultiple(component, apply) :
+            if (typeof component === 'string') {
                 registry.get(component, apply);
+            } else if (typeof component === 'function') {
+                component(apply);
+            }
         }
     };
+
+    ko.virtualElements.allowedBindings.scope = true;
 });

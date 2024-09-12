@@ -1,51 +1,80 @@
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Academic Free License (AFL 3.0)
- * that is bundled with this package in the file LICENSE_AFL.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 /** Creates outerClick binding and registers in to ko.bindingHandlers object */
 define([
     'ko',
-    'jquery'
-], function (ko, $) {
+    'jquery',
+    'underscore'
+], function (ko, $, _) {
     'use strict';
+
+    var defaults = {
+        onlyIfVisible: true
+    };
+
+    /**
+     * Document click handler which in case if event target is not
+     * a descendant of provided container element,
+     * invokes specfied in configuration callback.
+     *
+     * @param {HTMLElement} container
+     * @param {Object} config
+     * @param {EventObject} e
+     */
+    function onOuterClick(container, config, e) {
+        var target = e.target,
+            callback = config.callback;
+
+        if (container === target || container.contains(target)) {
+            return;
+        }
+
+        if (config.onlyIfVisible) {
+            if (!_.isNull(container.offsetParent)) {
+                callback();
+            }
+        } else {
+            callback();
+        }
+    }
+
+    /**
+     * Prepares configuration for the binding based
+     * on a default properties and provided options.
+     *
+     * @param {(Object|Function)} [options={}]
+     * @returns {Object}
+     */
+    function buildConfig(options) {
+        var config = {};
+
+        if (_.isFunction(options)) {
+            options = {
+                callback: options
+            };
+        } else if (!_.isObject(options)) {
+            options = {};
+        }
+
+        return _.extend(config, defaults, options);
+    }
 
     ko.bindingHandlers.outerClick = {
 
         /**
-         * Attaches click handler to document
-         * @param {HTMLElement} el - Element, that binding is applied to
-         * @param {Function} valueAccessor - Function that returns value, passed to binding
-         * @param  {Object} allBindings - all bindings object
-         * @param  {Object} viewModel - reference to viewmodel
+         * Initializes outer click binding.
          */
-        init: function (element, valueAccessor, allBindings, viewModel) {
-            var callback = valueAccessor();
+        init: function (element, valueAccessor) {
+            var config = buildConfig(valueAccessor()),
+                outerClick = onOuterClick.bind(null, element, config);
 
-            callback = callback.bind(viewModel);
-
-            $(document).on('click', callback);
+            $(document).on('click', outerClick);
 
             ko.utils.domNodeDisposal.addDisposeCallback(element, function () {
-                $(document).off('click', callback);
+                $(document).off('click', outerClick);
             });
         }
-    }
+    };
 });

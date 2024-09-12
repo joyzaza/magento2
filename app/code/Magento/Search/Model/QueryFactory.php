@@ -1,32 +1,14 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Search\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Helper\Context;
-use Magento\Framework\ObjectManager;
-use Magento\Framework\Stdlib\String as StdlibString;
+use Magento\Framework\ObjectManagerInterface;
+use Magento\Framework\Stdlib\StringUtils as StdlibString;
 use Magento\Store\Model\ScopeInterface;
 
 class QueryFactory implements QueryFactoryInterface
@@ -47,7 +29,7 @@ class QueryFactory implements QueryFactoryInterface
     private $query;
 
     /**
-     * @var ObjectManager
+     * @var ObjectManagerInterface
      */
     private $objectManager;
 
@@ -63,20 +45,19 @@ class QueryFactory implements QueryFactoryInterface
 
     /**
      * @param Context $context
-     * @param ObjectManager $objectManager
+     * @param ObjectManagerInterface $objectManager
      * @param StdlibString $string
      * @param ScopeConfigInterface $scopeConfig
      */
     public function __construct(
         Context $context,
-        ObjectManager $objectManager,
-        StdlibString $string,
-        ScopeConfigInterface $scopeConfig
+        ObjectManagerInterface $objectManager,
+        StdlibString $string
     ) {
         $this->request = $context->getRequest();
         $this->objectManager = $objectManager;
         $this->string = $string;
-        $this->scopeConfig = $scopeConfig;
+        $this->scopeConfig = $context->getScopeConfig();
     }
 
     /**
@@ -85,26 +66,28 @@ class QueryFactory implements QueryFactoryInterface
     public function get()
     {
         if (!$this->query) {
-            $this->query = $this->create();
+            $maxQueryLength = $this->getMaxQueryLength();
+            $rawQueryText = $this->getRawQueryText();
+            $preparedQueryText = $this->getPreparedQueryText($rawQueryText, $maxQueryLength);
+            $query = $this->create()->loadByQuery($preparedQueryText);
+            if (!$query->getId()) {
+                $query->setQueryText($preparedQueryText);
+            }
+            $query->setIsQueryTextExceeded($this->isQueryTooLong($rawQueryText, $maxQueryLength));
+            $this->query = $query;
         }
         return $this->query;
     }
 
     /**
-     * @return Query
+     * Create new instance
+     *
+     * @param array $data
+     * @return \Magento\Search\Model\Query
      */
-    private function create()
+    public function create(array $data = [])
     {
-        $maxQueryLength = $this->getMaxQueryLength();
-        $rawQueryText = $this->getRawQueryText();
-        $preparedQueryText = $this->getPreparedQueryText($rawQueryText, $maxQueryLength);
-        /** @var \Magento\Search\Model\Query $query */
-        $query = $this->objectManager->create('\Magento\Search\Model\Query')->loadByQuery($preparedQueryText);
-        if (!$query->getId()) {
-            $query->setQueryText($preparedQueryText);
-        }
-        $query->setIsQueryTextExceeded($this->isQueryTooLong($preparedQueryText, $maxQueryLength));
-        return $query;
+        return $this->objectManager->create('Magento\Search\Model\Query', $data);
     }
 
     /**

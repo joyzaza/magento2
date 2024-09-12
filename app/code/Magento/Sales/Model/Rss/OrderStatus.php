@@ -1,29 +1,11 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Model\Rss;
 
-use \Magento\Framework\App\Rss\DataProviderInterface;
+use Magento\Framework\App\Rss\DataProviderInterface;
 
 /**
  * Class OrderStatus
@@ -44,12 +26,12 @@ class OrderStatus implements DataProviderInterface
     protected $order;
 
     /**
-     * @var \Magento\Sales\Model\Resource\Order\Rss\OrderStatusFactory
+     * @var \Magento\Sales\Model\ResourceModel\Order\Rss\OrderStatusFactory
      */
     protected $orderResourceFactory;
 
     /**
-     * @var \Magento\Framework\ObjectManager
+     * @var \Magento\Framework\ObjectManagerInterface
      */
     protected $objectManager;
 
@@ -74,19 +56,19 @@ class OrderStatus implements DataProviderInterface
     protected $orderFactory;
 
     /**
-     * @param \Magento\Framework\ObjectManager $objectManager
+     * @param \Magento\Framework\ObjectManagerInterface $objectManager
      * @param \Magento\Framework\UrlInterface $urlBuilder
      * @param \Magento\Framework\App\RequestInterface $request
-     * @param \Magento\Sales\Model\Resource\Order\Rss\OrderStatusFactory $orderResourceFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Rss\OrderStatusFactory $orderResourceFactory
      * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
      * @param \Magento\Sales\Model\OrderFactory $orderFactory
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      */
     public function __construct(
-        \Magento\Framework\ObjectManager $objectManager,
+        \Magento\Framework\ObjectManagerInterface $objectManager,
         \Magento\Framework\UrlInterface $urlBuilder,
         \Magento\Framework\App\RequestInterface $request,
-        \Magento\Sales\Model\Resource\Order\Rss\OrderStatusFactory $orderResourceFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Rss\OrderStatusFactory $orderResourceFactory,
         \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
         \Magento\Sales\Model\OrderFactory $orderFactory,
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
@@ -105,7 +87,7 @@ class OrderStatus implements DataProviderInterface
      *
      * @return bool
      */
-    public function isAllowed ()
+    public function isAllowed()
     {
         if ($this->config->getValue('rss/order/status', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)) {
             return true;
@@ -119,7 +101,7 @@ class OrderStatus implements DataProviderInterface
     public function getRssData()
     {
         $this->order = $this->getOrder();
-        if (is_null($this->order)) {
+        if ($this->order === null) {
             throw new \InvalidArgumentException('Order not found.');
         }
         return array_merge($this->getHeader(), $this->getEntries());
@@ -131,7 +113,11 @@ class OrderStatus implements DataProviderInterface
     public function getCacheKey()
     {
         $order = $this->getOrder();
-        return 'rss_order_status_data_' . md5($order->getId() . $order->getIncrementId() . $order->getCustomerId());
+        $key = '';
+        if ($order !== null) {
+            $key = md5($order->getId() . $order->getIncrementId() . $order->getCustomerId());
+        }
+        return 'rss_order_status_data_' . $key;
     }
 
     /**
@@ -151,7 +137,11 @@ class OrderStatus implements DataProviderInterface
             return $this->order;
         }
 
-        $data = json_decode(base64_decode((string)$this->request->getParam('data')), true);
+        $data = null;
+        $json = base64_decode((string)$this->request->getParam('data'));
+        if ($json) {
+            $data = json_decode($json, true);
+        }
         if (!is_array($data)) {
             return null;
         }
@@ -164,7 +154,7 @@ class OrderStatus implements DataProviderInterface
         $order = $this->orderFactory->create();
         $order->load($data['order_id']);
 
-        if ($order->getIncrementId() != $data['increment_id'] || $order->getCustomerId() != $data['customer_id']) {
+        if ($order->getIncrementId() !== $data['increment_id'] || $order->getCustomerId() !== $data['customer_id']) {
             $order = null;
         }
         $this->order = $order;
@@ -179,10 +169,10 @@ class OrderStatus implements DataProviderInterface
      */
     protected function getEntries()
     {
-        /** @var $resourceModel \Magento\Sales\Model\Resource\Order\Rss\OrderStatus */
+        /** @var $resourceModel \Magento\Sales\Model\ResourceModel\Order\Rss\OrderStatus */
         $resourceModel = $this->orderResourceFactory->create();
         $results = $resourceModel->getAllCommentCollection($this->order->getId());
-        $entries = array();
+        $entries = [];
         if ($results) {
             foreach ($results as $result) {
                 $urlAppend = 'view';
@@ -197,21 +187,21 @@ class OrderStatus implements DataProviderInterface
                     . __('Comment: %1<br/>', $result['comment']) . '</p>';
                 $url = $this->urlBuilder->getUrl(
                     'sales/order/' . $urlAppend,
-                    array('order_id' => $this->order->getId())
+                    ['order_id' => $this->order->getId()]
                 );
-                $entries[] = array('title' => $title, 'link' => $url, 'description' => $description);
+                $entries[] = ['title' => $title, 'link' => $url, 'description' => $description];
             }
         }
         $title = __('Order #%1 created at %2', $this->order->getIncrementId(), $this->localeDate->formatDate(
             $this->order->getCreatedAt()
         ));
-        $url = $this->urlBuilder->getUrl('sales/order/view', array('order_id' => $this->order->getId()));
+        $url = $this->urlBuilder->getUrl('sales/order/view', ['order_id' => $this->order->getId()]);
         $description = '<p>' . __('Current Status: %1<br/>', $this->order->getStatusLabel()) .
             __('Total: %1<br/>', $this->order->formatPrice($this->order->getGrandTotal())) . '</p>';
 
-        $entries[] = array('title' => $title, 'link' => $url, 'description' => $description);
+        $entries[] = ['title' => $title, 'link' => $url, 'description' => $description];
 
-        return array('entries' => $entries);
+        return ['entries' => $entries];
     }
 
     /**
@@ -222,9 +212,9 @@ class OrderStatus implements DataProviderInterface
     protected function getHeader()
     {
         $title = __('Order # %1 Notification(s)', $this->order->getIncrementId());
-        $newUrl = $this->urlBuilder->getUrl('sales/order/view', array('order_id' => $this->order->getId()));
+        $newUrl = $this->urlBuilder->getUrl('sales/order/view', ['order_id' => $this->order->getId()]);
 
-        return array('title' => $title, 'description' => $title, 'link' => $newUrl, 'charset' => 'UTF-8');
+        return ['title' => $title, 'description' => $title, 'link' => $newUrl, 'charset' => 'UTF-8'];
     }
 
     /**
@@ -232,6 +222,14 @@ class OrderStatus implements DataProviderInterface
      */
     public function getFeeds()
     {
-        return array();
+        return [];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isAuthRequired()
+    {
+        return true;
     }
 }

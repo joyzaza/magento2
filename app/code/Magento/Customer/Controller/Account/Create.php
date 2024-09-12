@@ -1,66 +1,65 @@
 <?php
 /**
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Account;
 
-use Magento\Framework\App\Action\Context;
+use Magento\Customer\Model\Registration;
 use Magento\Customer\Model\Session;
-use Magento\Customer\Helper\Data as CustomerHelper;
+use Magento\Framework\View\Result\PageFactory;
+use Magento\Framework\App\Action\Context;
 
-class Create extends \Magento\Customer\Controller\Account
+class Create extends \Magento\Customer\Controller\AbstractAccount
 {
-    /** @var CustomerHelper */
-    protected $customerHelper;
+    /** @var Registration */
+    protected $registration;
+
+    /**
+     * @var Session
+     */
+    protected $session;
+
+    /**
+     * @var PageFactory
+     */
+    protected $resultPageFactory;
 
     /**
      * @param Context $context
      * @param Session $customerSession
-     * @param CustomerHelper $customerHelper
+     * @param PageFactory $resultPageFactory
+     * @param Registration $registration
      */
     public function __construct(
         Context $context,
         Session $customerSession,
-        CustomerHelper $customerHelper
+        PageFactory $resultPageFactory,
+        Registration $registration
     ) {
-        $this->customerHelper = $customerHelper;
-        parent::__construct($context, $customerSession);
+        $this->session = $customerSession;
+        $this->resultPageFactory = $resultPageFactory;
+        $this->registration = $registration;
+        parent::__construct($context);
     }
 
     /**
      * Customer register form page
      *
-     * @return void
+     * @return \Magento\Framework\Controller\Result\Redirect|\Magento\Framework\View\Result\Page
      */
     public function execute()
     {
-        if ($this->_getSession()->isLoggedIn() || !$this->customerHelper->isRegistrationAllowed()) {
-            $this->_redirect('*/*');
-            return;
+        if ($this->session->isLoggedIn() || !$this->registration->isAllowed()) {
+            /** @var \Magento\Framework\Controller\Result\Redirect $resultRedirect */
+            $resultRedirect = $this->resultRedirectFactory->create();
+            $resultRedirect->setPath('*/*');
+            return $resultRedirect;
         }
 
-        $this->_view->loadLayout();
-        $this->_view->getLayout()->initMessages();
-        $this->_view->renderLayout();
+        /** @var \Magento\Framework\View\Result\Page $resultPage */
+        $resultPage = $this->resultPageFactory->create();
+        return $resultPage;
     }
 }

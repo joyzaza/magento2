@@ -2,28 +2,12 @@
 /**
  * Depersonalize catalog session data
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Layout;
+
+use Magento\PageCache\Model\DepersonalizeChecker;
 
 /**
  * Class DepersonalizePlugin
@@ -31,19 +15,9 @@ namespace Magento\Catalog\Model\Layout;
 class DepersonalizePlugin
 {
     /**
-     * @var \Magento\Framework\App\RequestInterface
+     * @var DepersonalizeChecker
      */
-    protected $request;
-
-    /**
-     * @var \Magento\Framework\Module\Manager
-     */
-    protected $moduleManager;
-
-    /**
-     * @var \Magento\PageCache\Model\Config
-     */
-    protected $cacheConfig;
+    protected $depersonalizeChecker;
 
     /**
      * Catalog session
@@ -53,21 +27,15 @@ class DepersonalizePlugin
     protected $catalogSession;
 
     /**
+     * @param DepersonalizeChecker $depersonalizeChecker
      * @param \Magento\Catalog\Model\Session $catalogSession
-     * @param \Magento\Framework\App\RequestInterface $request
-     * @param \Magento\Framework\Module\Manager $moduleManager
-     * @param \Magento\PageCache\Model\Config $cacheConfig
      */
     public function __construct(
-        \Magento\Catalog\Model\Session $catalogSession,
-        \Magento\Framework\Module\Manager $moduleManager,
-        \Magento\Framework\App\RequestInterface $request,
-        \Magento\PageCache\Model\Config $cacheConfig
+        DepersonalizeChecker $depersonalizeChecker,
+        \Magento\Catalog\Model\Session $catalogSession
     ) {
         $this->catalogSession = $catalogSession;
-        $this->request = $request;
-        $this->moduleManager = $moduleManager;
-        $this->cacheConfig = $cacheConfig;
+        $this->depersonalizeChecker = $depersonalizeChecker;
     }
 
     /**
@@ -79,11 +47,7 @@ class DepersonalizePlugin
      */
     public function afterGenerateXml(\Magento\Framework\View\LayoutInterface $subject, $result)
     {
-        if ($this->moduleManager->isEnabled('Magento_PageCache')
-            && $this->cacheConfig->isEnabled()
-            && !$this->request->isAjax()
-            && $subject->isCacheable()
-        ) {
+        if ($this->depersonalizeChecker->checkIfDepersonalize($subject)) {
             $this->catalogSession->clearStorage();
         }
         return $result;

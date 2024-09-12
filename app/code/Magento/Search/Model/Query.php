@@ -1,45 +1,27 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Search\Model;
 
-use Magento\Search\Model\Resource\Query\Collection as QueryCollection;
-use Magento\Search\Model\Resource\Query\CollectionFactory as QueryCollectionFactory;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Search\Model\ResourceModel\Query\Collection as QueryCollection;
+use Magento\Search\Model\ResourceModel\Query\CollectionFactory as QueryCollectionFactory;
 use Magento\Search\Model\SearchCollectionInterface as Collection;
 use Magento\Search\Model\SearchCollectionFactory as CollectionFactory;
-use Magento\Eav\Model\Entity\Collection\AbstractCollection;
 use Magento\Framework\App\Config\ScopeConfigInterface;
-use Magento\Framework\Data\Collection\Db;
+use Magento\Framework\Data\Collection\AbstractDb as DbCollection;
 use Magento\Framework\Model\AbstractModel;
-use Magento\Framework\Model\Resource\AbstractResource;
+use Magento\Framework\Model\ResourceModel\AbstractResource;
 use Magento\Framework\Registry;
-use Magento\Framework\StoreManagerInterface;
+use Magento\Store\Model\StoreManagerInterface;
 
 /**
  * Search query model
  *
- * @method Resource\Query _getResource()
- * @method Resource\Query getResource()
+ * @method \Magento\Search\Model\ResourceModel\Query _getResource()
+ * @method \Magento\Search\Model\ResourceModel\Query getResource()
  * @method \Magento\Search\Model\Query setQueryText(string $value)
  * @method int getNumResults()
  * @method \Magento\Search\Model\Query setNumResults(int $value)
@@ -58,6 +40,8 @@ use Magento\Framework\StoreManagerInterface;
  * @method \Magento\Search\Model\Query setIsProcessed(int $value)
  * @method string getUpdatedAt()
  * @method \Magento\Search\Model\Query setUpdatedAt(string $value)
+ * @method \Magento\Search\Model\Query setIsQueryTextExceeded(bool $value)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Query extends AbstractModel implements QueryInterface
 {
@@ -80,8 +64,6 @@ class Query extends AbstractModel implements QueryInterface
     const XML_PATH_MIN_QUERY_LENGTH = 'catalog/search/min_query_length';
 
     const XML_PATH_MAX_QUERY_LENGTH = 'catalog/search/max_query_length';
-
-    const XML_PATH_MAX_QUERY_WORDS = 'catalog/search/max_query_words';
 
     /**
      * Core store config
@@ -119,9 +101,9 @@ class Query extends AbstractModel implements QueryInterface
      * @param QueryCollectionFactory $queryCollectionFactory
      * @param CollectionFactory $searchCollectionFactory
      * @param StoreManagerInterface $storeManager
-     * @param Config $scopeConfig
-     * @param \Magento\Framework\Model\Resource\AbstractResource $resource
-     * @param Db $resourceCollection
+     * @param ScopeConfigInterface $scopeConfig
+     * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
+     * @param DbCollection $resourceCollection
      * @param array $data
      */
     public function __construct(
@@ -132,8 +114,8 @@ class Query extends AbstractModel implements QueryInterface
         StoreManagerInterface $storeManager,
         ScopeConfigInterface $scopeConfig,
         AbstractResource $resource = null,
-        Db $resourceCollection = null,
-        array $data = array()
+        DbCollection $resourceCollection = null,
+        array $data = []
     ) {
         $this->_queryCollectionFactory = $queryCollectionFactory;
         $this->_searchCollectionFactory = $searchCollectionFactory;
@@ -149,7 +131,7 @@ class Query extends AbstractModel implements QueryInterface
      */
     protected function _construct()
     {
-        $this->_init('Magento\Search\Model\Resource\Query');
+        $this->_init('Magento\Search\Model\ResourceModel\Query');
     }
 
     /**
@@ -163,29 +145,6 @@ class Query extends AbstractModel implements QueryInterface
     }
 
     /**
-     * Retrieve collection of search results
-     *
-     * @deplecated
-     * @return AbstractCollection
-     */
-    public function getResultCollection()
-    {
-        $collection = $this->getData('result_collection');
-        if (is_null($collection)) {
-            $collection = $this->getSearchCollection();
-
-            $text = $this->getSynonymFor();
-            if (!$text) {
-                $text = $this->getQueryText();
-            }
-
-            $collection->addSearchFilter($text)->addStoreFilter()->addMinimalPrice()->addTaxPercents();
-            $this->setData('result_collection', $collection);
-        }
-        return $collection;
-    }
-
-    /**
      * Retrieve collection of suggest queries
      *
      * @return QueryCollection
@@ -193,7 +152,7 @@ class Query extends AbstractModel implements QueryInterface
     public function getSuggestCollection()
     {
         $collection = $this->getData('suggest_collection');
-        if (is_null($collection)) {
+        if ($collection === null) {
             $collection = $this->_queryCollectionFactory->create()->setStoreId(
                 $this->getStoreId()
             )->setQueryFilter(
@@ -274,6 +233,36 @@ class Query extends AbstractModel implements QueryInterface
     }
 
     /**
+     * Save query with incremental popularity
+     *
+     * @return $this
+     *
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function saveIncrementalPopularity()
+    {
+        $this->getResource()->saveIncrementalPopularity($this);
+
+        return $this;
+    }
+
+    /**
+     * Save query with number of results
+     *
+     * @param int $numResults
+     * @return $this
+     *
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function saveNumResults($numResults)
+    {
+        $this->setNumResults($numResults);
+        $this->getResource()->saveNumResults($this);
+
+        return $this;
+    }
+
+    /**
      * Retrieve minimum query length
      *
      * @return int
@@ -302,21 +291,8 @@ class Query extends AbstractModel implements QueryInterface
     }
 
     /**
-     * Retrieve maximum query words for like search
-     *
-     * @return int
-     */
-    public function getMaxQueryWords()
-    {
-        return $this->_scopeConfig->getValue(
-            self::XML_PATH_MAX_QUERY_WORDS,
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
-            $this->getStoreId()
-        );
-    }
-
-    /**
      * @return string
+     * @codeCoverageIgnore
      */
     public function getQueryText()
     {
@@ -325,6 +301,7 @@ class Query extends AbstractModel implements QueryInterface
 
     /**
      * @return bool
+     * @codeCoverageIgnore
      */
     public function isQueryTextExceeded()
     {

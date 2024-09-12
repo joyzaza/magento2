@@ -1,52 +1,61 @@
 <?php
 /**
- *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Cms\Controller\Adminhtml\Page;
 
-use Magento\Cms\Controller\Adminhtml\AbstractMassDelete;
+use Magento\Framework\Controller\ResultFactory;
+use Magento\Backend\App\Action\Context;
+use Magento\Ui\Component\MassAction\Filter;
+use Magento\Cms\Model\ResourceModel\Page\CollectionFactory;
 
 /**
  * Class MassDelete
  */
-class MassDelete extends AbstractMassDelete
+class MassDelete extends \Magento\Backend\App\Action
 {
     /**
-     * Field id
+     * @var Filter
      */
-    const ID_FIELD = 'page_id';
+    protected $filter;
 
     /**
-     * Resource collection
-     *
-     * @var string
+     * @var CollectionFactory
      */
-    protected $collection = 'Magento\Cms\Model\Resource\Page\Collection';
+    protected $collectionFactory;
 
     /**
-     * Page model
-     *
-     * @var string
+     * @param Context $context
+     * @param Filter $filter
+     * @param CollectionFactory $collectionFactory
      */
-    protected $model = 'Magento\Cms\Model\Page';
+    public function __construct(Context $context, Filter $filter, CollectionFactory $collectionFactory)
+    {
+        $this->filter = $filter;
+        $this->collectionFactory = $collectionFactory;
+        parent::__construct($context);
+    }
+
+    /**
+     * Execute action
+     *
+     * @return \Magento\Backend\Model\View\Result\Redirect
+     * @throws \Magento\Framework\Exception\LocalizedException|\Exception
+     */
+    public function execute()
+    {
+        $collection = $this->filter->getCollection($this->collectionFactory->create());
+        $collectionSize = $collection->getSize();
+
+        foreach ($collection as $page) {
+            $page->delete();
+        }
+
+        $this->messageManager->addSuccess(__('A total of %1 record(s) have been deleted.', $collectionSize));
+
+        /** @var \Magento\Backend\Model\View\Result\Redirect $resultRedirect */
+        $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+        return $resultRedirect->setPath('*/*/');
+    }
 }

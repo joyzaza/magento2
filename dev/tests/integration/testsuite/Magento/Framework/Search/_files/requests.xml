@@ -1,29 +1,11 @@
 <?xml version="1.0"?>
 <!--
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Academic Free License (AFL 3.0)
- * that is bundled with this package in the file LICENSE_AFL.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/afl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 -->
-<requests xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../../../../../../lib/internal/Magento/Framework/Search/etc/search_request_merged.xsd">
+<requests xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Search/etc/search_request_merged.xsd">
     <request query="one_match" index="catalogsearch_fulltext">
         <dimensions>
             <dimension name="scope" value="default"/>
@@ -34,7 +16,7 @@
             </query>
 
             <query xsi:type="matchQuery" name="fulltext_search_query" value="$fulltext_search_query$" boost="5">
-                <match field="data_index" boost="2"/>
+                <match field="data_index"/>
             </query>
         </queries>
         <from>10</from>
@@ -50,7 +32,7 @@
             </query>
 
             <query xsi:type="matchQuery" name="fulltext_search_query" value="$fulltext_search_query$" boost="5">
-                <match field="data_index" boost="2"/>
+                <match field="data_index"/>
             </query>
         </queries>
         <aggregations>
@@ -69,7 +51,7 @@
                     <range from="18" to=""/>
                 </ranges>
             </bucket>
-            <bucket xsi:type="dynamicBucket" method="dynamic1" name="dynamic_price" field="price" />
+            <bucket xsi:type="dynamicBucket" method="manual" name="dynamic_price" field="price" />
         </aggregations>
         <from>10</from>
         <size>10</size>
@@ -84,7 +66,7 @@
             </query>
         </queries>
         <filters>
-            <filter xsi:type="wildcardFilter" name="wildcard_filter" value="$wildcard_filter$" field="data_index"/>
+            <filter xsi:type="wildcardFilter" name="wildcard_filter" value="$wildcard_filter$" field="name"/>
         </filters>
         <from>10</from>
         <size>10</size>
@@ -101,13 +83,13 @@
                 <queryReference clause="must" ref="filtered_query_filter_rm"/>
             </query>
             <query xsi:type="matchQuery" name="fulltext_search_query" value="$fulltext_search_query$" boost="5">
-                <match field="data_index" boost="2"/>
+                <match field="data_index"/>
             </query>
             <query xsi:type="filteredQuery" name="filtered_query">
                 <filterReference clause="must" ref="pid"/>
             </query>
             <query xsi:type="filteredQuery" name="filtered_query_rm">
-                <queryReference ref="fulltext_search_query_rm"/>
+                <queryReference clause= "must" ref="fulltext_search_query_rm"/>
             </query>
             <query xsi:type="filteredQuery" name="filtered_query_filter_rm">
                 <filterReference clause="must" ref="bool_filter_rm"/>
@@ -121,14 +103,14 @@
                 <filterReference clause="must" ref="term_rm"/>
                 <filterReference clause="must" ref="range_rm"/>
             </filter>
-            <filter name="range_rm" xsi:type="rangeFilter" field="product_id" from="$not_bind$" to="$not_bind$"/>
-            <filter name="term_rm" xsi:type="termFilter" field="product_id" value="$not_bind$"/>
+            <filter name="range_rm" xsi:type="rangeFilter" field="price" from="$not_bind$" to="$not_bind$"/>
+            <filter name="term_rm" xsi:type="termFilter" field="price" value="$not_bind$"/>
             <filter xsi:type="boolFilter" name="pid">
                 <filterReference clause="should" ref="pidm"/>
                 <filterReference clause="should" ref="pidsh"/>
             </filter>
-            <filter name="pidm" xsi:type="rangeFilter" field="product_id" from="$pidm_from$" to="$pidm_to$"/>
-            <filter name="pidsh" xsi:type="termFilter" field="product_id" value="$pidsh$"/>
+            <filter name="pidm" xsi:type="rangeFilter" field="price" from="$pidm_from$" to="$pidm_to$"/>
+            <filter name="pidsh" xsi:type="termFilter" field="price" value="$pidsh$"/>
         </filters>
         <from>10</from>
         <size>10</size>
@@ -145,7 +127,7 @@
         <filters>
             <filter name="range_filter"
                     xsi:type="rangeFilter"
-                    field="product_id"
+                    field="price"
                     from="$range_filter_from$"
                     to="$range_filter_to$"/>
         </filters>
@@ -164,7 +146,7 @@
         <filters>
             <filter name="range_filter_without_from_field"
                     xsi:type="rangeFilter"
-                    field="product_id"
+                    field="price"
                     to="$range_filter_to$"/>
         </filters>
         <from>10</from>
@@ -182,7 +164,7 @@
         <filters>
             <filter name="range_filter_without_to_field"
                     xsi:type="rangeFilter"
-                    field="product_id"
+                    field="price"
                     from="$range_filter_from$"/>
         </filters>
         <from>10</from>
@@ -198,7 +180,7 @@
             </query>
         </queries>
         <filters>
-            <filter name="term_filter" xsi:type="termFilter" field="product_id" value="$request.product_id$"/>
+            <filter name="term_filter" xsi:type="termFilter" field="price" value="$request.price$"/>
         </filters>
         <from>10</from>
         <size>10</size>
@@ -224,32 +206,32 @@
             </filter>
             <filter name="must_range_filter1"
                     xsi:type="rangeFilter"
-                    field="product_id"
+                    field="price"
                     from="$must_range_filter1_from$"
                     to="$must_range_filter1_to$"/>
             <filter name="should_term_filter1"
                     xsi:type="termFilter"
-                    field="product_id"
+                    field="price"
                     value="$should_term_filter1$"/>
             <filter name="should_term_filter2"
                     xsi:type="termFilter"
-                    field="product_id"
+                    field="price"
                     value="$should_term_filter2$"/>
             <filter name="should_term_filter3"
                     xsi:type="termFilter"
-                    field="product_id"
+                    field="price"
                     value="$should_term_filter3$"/>
             <filter name="should_term_filter4"
                     xsi:type="termFilter"
-                    field="product_id"
+                    field="price"
                     value="$should_term_filter4$"/>
             <filter name="not_term_filter1"
                     xsi:type="termFilter"
-                    field="product_id"
+                    field="price"
                     value="$not_term_filter1$"/>
             <filter name="not_term_filter2"
                     xsi:type="termFilter"
-                    field="product_id"
+                    field="price"
                     value="$not_term_filter2$"/>
         </filters>
         <from>10</from>
@@ -274,12 +256,12 @@
             </filter>
             <filter name="not_range_filter"
                     xsi:type="rangeFilter"
-                    field="product_id"
+                    field="price"
                     from="$not_range_filter_from$"
                     to="$not_range_filter_to$"/>
             <filter name="nested_not_term_filter"
                     xsi:type="termFilter"
-                    field="product_id"
+                    field="price"
                     value="$nested_not_term_filter$"/>
         </filters>
         <from>10</from>
@@ -303,7 +285,7 @@
             </filter>
             <filter name="nested_must_range_filter"
                     xsi:type="rangeFilter"
-                    field="product_id"
+                    field="price"
                     from="$nested_must_range_filter_from$"
                     to="$nested_must_range_filter_to$"/>
         </filters>
@@ -321,10 +303,10 @@
                 <queryReference clause="should" ref="query_filter"/>
             </query>
             <query xsi:type="matchQuery" name="name_query" value="$name_query$">
-                <match field="data_index" boost="1"/>
+                <match field="data_index"/>
             </query>
             <query xsi:type="matchQuery" name="description_query" value="$description$">
-                <match field="data_index" boost="1"/>
+                <match field="data_index"/>
             </query>
             <query xsi:type="filteredQuery" name="query_filter">
                 <filterReference clause="must" ref="filter"/>
@@ -332,14 +314,56 @@
         </queries>
         <filters>
             <filter xsi:type="boolFilter" name="filter">
-                <filterReference clause="must" ref="store_filter"/>
-                <filterReference clause="must" ref="product_id_filter"/>
+                <filterReference clause="must" ref="price_filter"/>
             </filter>
-            <filter name="store_filter" xsi:type="termFilter" field="store_id" value="$store_filter$"/>
-            <filter name="product_id_filter" xsi:type="rangeFilter" field="product_id" from="$request.from_product_id$"
-                    to="$request.to_product_id$"/>
+            <filter name="price_filter" xsi:type="rangeFilter" field="price" from="$request.from_price$" to="$request.to_price$"/>
         </filters>
         <from>10</from>
+        <size>10</size>
+    </request>
+    <request query="filterable_custom_attributes" index="catalogsearch_fulltext">
+        <dimensions>
+            <dimension name="scope" value="default"/>
+        </dimensions>
+        <queries>
+            <query xsi:type="boolQuery" name="filterable_custom_attributes" boost="1">
+                <queryReference clause="must" ref="category"/>
+                <queryReference clause="must" ref="price"/>
+                <queryReference clause="must" ref="select_attribute"/>
+                <queryReference clause="must" ref="multiselect_attribute"/>
+            </query>
+            <query xsi:type="filteredQuery" name="category">
+                <filterReference clause="must" ref="category_filter"/>
+            </query>
+            <query xsi:type="filteredQuery" name="price">
+                <filterReference clause="must" ref="price_filter"/>
+            </query>
+            <query xsi:type="filteredQuery" name="select_attribute">
+                <filterReference clause="must" ref="select_attribute_filter"/>
+            </query>
+            <query xsi:type="filteredQuery" name="multiselect_attribute">
+                <filterReference clause="must" ref="multiselect_attribute_filter"/>
+            </query>
+        </queries>
+        <filters>
+            <filter xsi:type="termFilter" name="category_filter" field="category_ids" value="$category_ids$"/>
+            <filter xsi:type="rangeFilter" name="price_filter" field="price" from="$price.from$" to="$price.to$"/>
+            <filter xsi:type="termFilter" name="select_attribute_filter" field="select_attribute" value="$select_attribute$"/>
+            <filter xsi:type="termFilter" name="multiselect_attribute_filter" field="multiselect_attribute" value="$multiselect_attribute$"/>
+        </filters>
+        <aggregations>
+            <bucket name="price_bucket" field="price" xsi:type="dynamicBucket" method="$price_dynamic_algorithm$">
+                <metrics>
+                    <metric type="count"/>
+                </metrics>
+            </bucket>
+            <bucket name="category_bucket" field="category_ids" xsi:type="termBucket">
+                <metrics>
+                    <metric type="count"/>
+                </metrics>
+            </bucket>
+        </aggregations>
+        <from>0</from>
         <size>10</size>
     </request>
 </requests>

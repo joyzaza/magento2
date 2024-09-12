@@ -1,25 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Rss\Product;
 
@@ -35,7 +17,7 @@ class NotifyStock extends \Magento\Framework\Model\AbstractModel
     protected $productFactory;
 
     /**
-     * @var \Magento\CatalogInventory\Model\Resource\StockFactory
+     * @var \Magento\CatalogInventory\Model\ResourceModel\StockFactory
      */
     protected $stockFactory;
 
@@ -53,13 +35,13 @@ class NotifyStock extends \Magento\Framework\Model\AbstractModel
 
     /**
      * @param \Magento\Catalog\Model\ProductFactory $productFactory
-     * @param \Magento\CatalogInventory\Model\Resource\StockFactory $stockFactory
+     * @param \Magento\CatalogInventory\Model\ResourceModel\StockFactory $stockFactory
      * @param \Magento\Catalog\Model\Product\Attribute\Source\Status $productStatus
      * @param \Magento\Framework\Event\ManagerInterface $eventManager
      */
     public function __construct(
         \Magento\Catalog\Model\ProductFactory $productFactory,
-        \Magento\CatalogInventory\Model\Resource\StockFactory $stockFactory,
+        \Magento\CatalogInventory\Model\ResourceModel\StockFactory $stockFactory,
         \Magento\Catalog\Model\Product\Attribute\Source\Status $productStatus,
         \Magento\Framework\Event\ManagerInterface $eventManager
     ) {
@@ -69,29 +51,28 @@ class NotifyStock extends \Magento\Framework\Model\AbstractModel
         $this->eventManager = $eventManager;
     }
 
-
     /**
-     * @return \Magento\Catalog\Model\Resource\Product\Collection
+     * @return \Magento\Catalog\Model\ResourceModel\Product\Collection
      */
     public function getProductsCollection()
     {
         /* @var $product \Magento\Catalog\Model\Product */
         $product = $this->productFactory->create();
-        /* @var $collection \Magento\Catalog\Model\Resource\Product\Collection */
+        /* @var $collection \Magento\Catalog\Model\ResourceModel\Product\Collection */
         $collection = $product->getCollection();
-        /** @var $resourceStock \Magento\CatalogInventory\Model\Resource\Stock */
+        /** @var $resourceStock \Magento\CatalogInventory\Model\ResourceModel\Stock */
         $resourceStock = $this->stockFactory->create();
         $resourceStock->addLowStockFilter(
             $collection,
-            array('qty', 'notify_stock_qty', 'low_stock_date', 'use_config' => 'use_config_notify_stock_qty')
+            ['qty', 'notify_stock_qty', 'low_stock_date', 'use_config' => 'use_config_notify_stock_qty']
         );
         $collection->addAttributeToSelect('name', true)
-            ->addAttributeToFilter('status', array('in' => $this->productStatus->getVisibleStatusIds()))
+            ->addAttributeToFilter('status', ['in' => $this->productStatus->getVisibleStatusIds()])
             ->setOrder('low_stock_date');
 
         $this->eventManager->dispatch(
             'rss_catalog_notify_stock_collection_select',
-            array('collection' => $collection)
+            ['collection' => $collection]
         );
         return $collection;
     }

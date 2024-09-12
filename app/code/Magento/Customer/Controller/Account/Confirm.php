@@ -1,46 +1,30 @@
 <?php
 /**
  *
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Account;
 
+use Magento\Customer\Model\Url;
 use Magento\Framework\App\Action\Context;
 use Magento\Customer\Model\Session;
 use Magento\Framework\App\Config\ScopeConfigInterface;
-use Magento\Framework\StoreManagerInterface;
-use Magento\Customer\Service\V1\CustomerAccountServiceInterface;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\Customer\Api\AccountManagementInterface;
+use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Helper\Address;
 use Magento\Framework\UrlFactory;
 use Magento\Framework\Exception\StateException;
-use Magento\Customer\Helper\Data as CustomerData;
 use Magento\Store\Model\ScopeInterface;
+use Magento\Framework\Controller\ResultFactory;
 
 /**
  * Class Confirm
  *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-class Confirm extends \Magento\Customer\Controller\Account
+class Confirm extends \Magento\Customer\Controller\AbstractAccount
 {
     /** @var ScopeConfigInterface */
     protected $scopeConfig;
@@ -48,8 +32,11 @@ class Confirm extends \Magento\Customer\Controller\Account
     /** @var StoreManagerInterface */
     protected $storeManager;
 
-    /** @var CustomerAccountServiceInterface  */
-    protected $customerAccountService;
+    /** @var AccountManagementInterface  */
+    protected $customerAccountManagement;
+
+    /** @var CustomerRepositoryInterface  */
+    protected $customerRepository;
 
     /** @var Address */
     protected $addressHelper;
@@ -58,11 +45,17 @@ class Confirm extends \Magento\Customer\Controller\Account
     protected $urlModel;
 
     /**
+     * @var Session
+     */
+    protected $session;
+
+    /**
      * @param Context $context
      * @param Session $customerSession
      * @param ScopeConfigInterface $scopeConfig
      * @param StoreManagerInterface $storeManager
-     * @param CustomerAccountServiceInterface $customerAccountService
+     * @param AccountManagementInterface $customerAccountManagement
+     * @param CustomerRepositoryInterface $customerRepository
      * @param Address $addressHelper
      * @param UrlFactory $urlFactory
      */
@@ -71,28 +64,34 @@ class Confirm extends \Magento\Customer\Controller\Account
         Session $customerSession,
         ScopeConfigInterface $scopeConfig,
         StoreManagerInterface $storeManager,
-        CustomerAccountServiceInterface $customerAccountService,
+        AccountManagementInterface $customerAccountManagement,
+        CustomerRepositoryInterface $customerRepository,
         Address $addressHelper,
         UrlFactory $urlFactory
     ) {
+        $this->session = $customerSession;
         $this->scopeConfig = $scopeConfig;
         $this->storeManager = $storeManager;
-        $this->customerAccountService = $customerAccountService;
+        $this->customerAccountManagement = $customerAccountManagement;
+        $this->customerRepository = $customerRepository;
         $this->addressHelper = $addressHelper;
         $this->urlModel = $urlFactory->create();
-        parent::__construct($context, $customerSession);
+        parent::__construct($context);
     }
 
     /**
      * Confirm customer account by id and confirmation key
      *
-     * @return void
+     * @return \Magento\Framework\Controller\Result\Redirect
      */
     public function execute()
     {
-        if ($this->_getSession()->isLoggedIn()) {
-            $this->_redirect('*/*/');
-            return;
+        /** @var \Magento\Framework\Controller\Result\Redirect $resultRedirect */
+        $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+
+        if ($this->session->isLoggedIn()) {
+            $resultRedirect->setPath('*/*/');
+            return $resultRedirect;
         }
         try {
             $customerId = $this->getRequest()->getParam('id', false);
@@ -101,22 +100,22 @@ class Confirm extends \Magento\Customer\Controller\Account
                 throw new \Exception(__('Bad request.'));
             }
 
-            // log in and send greeting email, then die happy
-            $customer = $this->customerAccountService->activateCustomer($customerId, $key);
-            $this->_getSession()->setCustomerDataAsLoggedIn($customer);
+            // log in and send greeting email
+            $customerEmail = $this->customerRepository->getById($customerId)->getEmail();
+            $customer = $this->customerAccountManagement->activate($customerEmail, $key);
+            $this->session->setCustomerDataAsLoggedIn($customer);
 
             $this->messageManager->addSuccess($this->getSuccessMessage());
-            $this->getResponse()->setRedirect($this->getSuccessRedirect());
-            return;
+            $resultRedirect->setUrl($this->getSuccessRedirect());
+            return $resultRedirect;
         } catch (StateException $e) {
             $this->messageManager->addException($e, __('This confirmation key is invalid or has expired.'));
         } catch (\Exception $e) {
             $this->messageManager->addException($e, __('There was an error confirming the account'));
         }
-        // die unhappy
-        $url = $this->urlModel->getUrl('*/*/index', array('_secure' => true));
-        $this->getResponse()->setRedirect($this->_redirect->error($url));
-        return;
+
+        $url = $this->urlModel->getUrl('*/*/index', ['_secure' => true]);
+        return $resultRedirect->setUrl($this->_redirect->error($url));
     }
 
     /**
@@ -130,14 +129,14 @@ class Confirm extends \Magento\Customer\Controller\Account
             if ($this->addressHelper->getTaxCalculationAddressType() == Address::TYPE_SHIPPING) {
                 // @codingStandardsIgnoreStart
                 $message = __(
-                    'If you are a registered VAT customer, please click <a href="%1">here</a> to enter you shipping address for proper VAT calculation',
+                    'If you are a registered VAT customer, please click <a href="%1">here</a> to enter your shipping address for proper VAT calculation.',
                     $this->urlModel->getUrl('customer/address/edit')
                 );
                 // @codingStandardsIgnoreEnd
             } else {
                 // @codingStandardsIgnoreStart
                 $message = __(
-                    'If you are a registered VAT customer, please click <a href="%1">here</a> to enter you billing address for proper VAT calculation',
+                    'If you are a registered VAT customer, please click <a href="%1">here</a> to enter your billing address for proper VAT calculation.',
                     $this->urlModel->getUrl('customer/address/edit')
                 );
                 // @codingStandardsIgnoreEnd
@@ -157,13 +156,13 @@ class Confirm extends \Magento\Customer\Controller\Account
     {
         $backUrl = $this->getRequest()->getParam('back_url', false);
         $redirectToDashboard = $this->scopeConfig->isSetFlag(
-            CustomerData::XML_PATH_CUSTOMER_STARTUP_REDIRECT_TO_DASHBOARD,
+            Url::XML_PATH_CUSTOMER_STARTUP_REDIRECT_TO_DASHBOARD,
             ScopeInterface::SCOPE_STORE
         );
-        if (!$redirectToDashboard && $this->_getSession()->getBeforeAuthUrl()) {
-            $successUrl = $this->_getSession()->getBeforeAuthUrl(true);
+        if (!$redirectToDashboard && $this->session->getBeforeAuthUrl()) {
+            $successUrl = $this->session->getBeforeAuthUrl(true);
         } else {
-            $successUrl = $this->urlModel->getUrl('*/*/index', array('_secure' => true));
+            $successUrl = $this->urlModel->getUrl('*/*/index', ['_secure' => true]);
         }
         return $this->_redirect->success($backUrl ? $backUrl : $successUrl);
     }

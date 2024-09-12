@@ -1,25 +1,7 @@
 <?php
 /**
- * Magento
- *
- * NOTICE OF LICENSE
- *
- * This source file is subject to the Open Software License (OSL 3.0)
- * that is bundled with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://opensource.org/licenses/osl-3.0.php
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade Magento to newer
- * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
- *
- * @copyright   Copyright (c) 2014 X.commerce, Inc. (http://www.magentocommerce.com)
- * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ * Copyright © 2015 Magento. All rights reserved.
+ * See COPYING.txt for license details.
  */
 
 namespace Magento\Theme\Block\Html\Header;
@@ -37,19 +19,19 @@ class Logo extends \Magento\Framework\View\Element\Template
     protected $_template = 'html/header/logo.phtml';
 
     /**
-     * @var \Magento\Core\Helper\File\Storage\Database
+     * @var \Magento\MediaStorage\Helper\File\Storage\Database
      */
     protected $_fileStorageHelper;
 
     /**
      * @param \Magento\Framework\View\Element\Template\Context $context
-     * @param \Magento\Core\Helper\File\Storage\Database $fileStorageHelper
+     * @param \Magento\MediaStorage\Helper\File\Storage\Database $fileStorageHelper
      * @param array $data
      */
     public function __construct(
         \Magento\Framework\View\Element\Template\Context $context,
-        \Magento\Core\Helper\File\Storage\Database $fileStorageHelper,
-        array $data = array()
+        \Magento\MediaStorage\Helper\File\Storage\Database $fileStorageHelper,
+        array $data = []
     ) {
         $this->_fileStorageHelper = $fileStorageHelper;
         parent::__construct($context, $data);
@@ -62,8 +44,8 @@ class Logo extends \Magento\Framework\View\Element\Template
      */
     public function isHomePage()
     {
-        $currentUrl = $this->getUrl('', array('_current' => true));
-        $urlRewrite = $this->getUrl('*/*/*', array('_current' => true, '_use_rewrite' => true));
+        $currentUrl = $this->getUrl('', ['_current' => true]);
+        $urlRewrite = $this->getUrl('*/*/*', ['_current' => true, '_use_rewrite' => true]);
         return $currentUrl == $urlRewrite;
     }
 
@@ -97,27 +79,59 @@ class Logo extends \Magento\Framework\View\Element\Template
     }
 
     /**
+     * Retrieve logo width
+     *
+     * @return int
+     */
+    public function getLogoWidth()
+    {
+        if (empty($this->_data['logo_width'])) {
+            $this->_data['logo_width'] = $this->_scopeConfig->getValue(
+                'design/header/logo_width',
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            );
+        }
+        return (int)$this->_data['logo_width'] ? : (int)$this->getLogoImgWidth();
+    }
+
+    /**
+     * Retrieve logo height
+     *
+     * @return int
+     */
+    public function getLogoHeight()
+    {
+        if (empty($this->_data['logo_height'])) {
+            $this->_data['logo_height'] = $this->_scopeConfig->getValue(
+                'design/header/logo_height',
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            );
+        }
+        return (int)$this->_data['logo_height'] ? : (int)$this->getLogoImgHeight();
+    }
+
+    /**
      * Retrieve logo image URL
      *
      * @return string
      */
     protected function _getLogoUrl()
     {
-        $folderName = \Magento\Backend\Model\Config\Backend\Image\Logo::UPLOAD_DIR;
+        $folderName = \Magento\Config\Model\Config\Backend\Image\Logo::UPLOAD_DIR;
         $storeLogoPath = $this->_scopeConfig->getValue(
             'design/header/logo_src',
             \Magento\Store\Model\ScopeInterface::SCOPE_STORE
         );
         $path = $folderName . '/' . $storeLogoPath;
         $logoUrl = $this->_urlBuilder
-                ->getBaseUrl(array('_type' => \Magento\Framework\UrlInterface::URL_TYPE_MEDIA)) . $path;
+                ->getBaseUrl(['_type' => \Magento\Framework\UrlInterface::URL_TYPE_MEDIA]) . $path;
 
-        if (!is_null($storeLogoPath) && $this->_isFile($path)) {
+        if ($storeLogoPath !== null && $this->_isFile($path)) {
             $url = $logoUrl;
         } elseif ($this->getLogoFile()) {
             $url = $this->getViewFileUrl($this->getLogoFile());
         } else {
-            $url = $this->getViewFileUrl('images/logo.gif');
+            $url = $this->getViewFileUrl('images/logo.svg');
         }
         return $url;
     }
